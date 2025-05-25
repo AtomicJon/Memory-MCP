@@ -1,0 +1,570 @@
+#!/usr/bin/env node
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from "@modelcontextprotocol/sdk/types.js";
+import { config } from "dotenv";
+import { DatabaseService } from "./database.js";
+import { EmbeddingService } from "./embeddings.js";
+import {
+  CreateMemoryInput,
+  EmbeddingConfig,
+  ListMemoriesInput,
+  SearchMemoryInput,
+} from "./types.js";
+
+// Load environment variables
+config();
+
+/**
+ * Validates input for store_memory tool
+ */
+function isValidStoreMemoryArgs(args: unknown): args is CreateMemoryInput {
+  return (
+    typeof args === "object" &&
+    args !== null &&
+    typeof (args as CreateMemoryInput).content === "string" &&
+    ((args as CreateMemoryInput).context === undefined ||
+      typeof (args as CreateMemoryInput).context === "string") &&
+    ((args as CreateMemoryInput).tags === undefined ||
+      Array.isArray((args as CreateMemoryInput).tags)) &&
+    ((args as CreateMemoryInput).importance_score === undefined ||
+      (typeof (args as CreateMemoryInput).importance_score === "number" &&
+        (args as CreateMemoryInput).importance_score! >= 1 &&
+        (args as CreateMemoryInput).importance_score! <= 5))
+  );
+}
+
+/**
+ * Validates input for search_memories tool
+ */
+function isValidSearchMemoriesArgs(args: unknown): args is SearchMemoryInput {
+  return (
+    typeof args === "object" &&
+    args !== null &&
+    typeof (args as SearchMemoryInput).query === "string" &&
+    ((args as SearchMemoryInput).limit === undefined ||
+      typeof (args as SearchMemoryInput).limit === "number") &&
+    ((args as SearchMemoryInput).similarity_threshold === undefined ||
+      typeof (args as SearchMemoryInput).similarity_threshold === "number") &&
+    ((args as SearchMemoryInput).tags === undefined ||
+      Array.isArray((args as SearchMemoryInput).tags)) &&
+    ((args as SearchMemoryInput).embedding_provider === undefined ||
+      (args as SearchMemoryInput).embedding_provider === "openai" ||
+      (args as SearchMemoryInput).embedding_provider === "ollama") &&
+    ((args as SearchMemoryInput).embedding_model === undefined ||
+      typeof (args as SearchMemoryInput).embedding_model === "string")
+  );
+}
+
+/**
+ * Validates input for list_memories tool
+ */
+function isValidListMemoriesArgs(args: unknown): args is ListMemoriesInput {
+  return (
+    typeof args === "object" &&
+    args !== null &&
+    ((args as ListMemoriesInput).limit === undefined ||
+      typeof (args as ListMemoriesInput).limit === "number") &&
+    ((args as ListMemoriesInput).offset === undefined ||
+      typeof (args as ListMemoriesInput).offset === "number") &&
+    ((args as ListMemoriesInput).tags === undefined ||
+      Array.isArray((args as ListMemoriesInput).tags)) &&
+    ((args as ListMemoriesInput).min_importance === undefined ||
+      typeof (args as ListMemoriesInput).min_importance === "number") &&
+    ((args as ListMemoriesInput).start_date === undefined ||
+      typeof (args as ListMemoriesInput).start_date === "string") &&
+    ((args as ListMemoriesInput).end_date === undefined ||
+      typeof (args as ListMemoriesInput).end_date === "string") &&
+    ((args as ListMemoriesInput).embedding_provider === undefined ||
+      (args as ListMemoriesInput).embedding_provider === "openai" ||
+      (args as ListMemoriesInput).embedding_provider === "ollama")
+  );
+}
+
+/**
+ * Validates input for delete_memory tool
+ */
+function isValidDeleteMemoryArgs(args: unknown): args is { memory_id: number } {
+  return (
+    typeof args === "object" &&
+    args !== null &&
+    typeof (args as { memory_id: number }).memory_id === "number"
+  );
+}
+
+/**
+ * Memory MCP Server
+ */
+class MemoryMCPServer {
+  private server: Server;
+  private database: DatabaseService;
+  private embeddings: EmbeddingService;
+
+  constructor() {
+    this.server = new Server(
+      {
+        name: "memory-mcp",
+        version: "0.1.0",
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      }
+    );
+
+    // Initialize database connection
+    const databaseUrl =
+      process.env.DATABASE_URL ||
+      "postgresql://memory_user:memory_password@localhost:5432/memory_mcp";
+    this.database = new DatabaseService(databaseUrl);
+
+    // Initialize embedding service
+    const embeddingConfig: EmbeddingConfig = {
+      provider:
+        (process.env.EMBEDDING_PROVIDER as "openai" | "ollama") || "ollama",
+      apiKey: process.env.OPENAI_API_KEY,
+      baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+      model: process.env.EMBEDDING_MODEL || "nomic-embed-text",
+      dimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || "768"),
+    };
+
+    this.embeddings = new EmbeddingService(embeddingConfig);
+
+    this.setupToolHandlers();
+
+    // Error handling
+    this.server.onerror = (error) => console.error("[MCP Error]", error);
+    process.on("SIGINT", async () => {
+      await this.cleanup();
+      process.exit(0);
+    });
+  }
+
+  /**
+   * Setup MCP tool handlers
+   */
+  private setupToolHandlers() {
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: [
+        {
+          name: "store_memory",
+          description: "Store a coding preference or correction as a memory",
+          inputSchema: {
+            type: "object",
+            properties: {
+              content: {
+                type: "string",
+                description: "The preference or correction content to store",
+              },
+              context: {
+                type: "string",
+                description: "Optional code context where this applies",
+              },
+              tags: {
+                type: "array",
+                items: { type: "string" },
+                description: "Optional array of tags for categorization",
+              },
+              importance_score: {
+                type: "number",
+                minimum: 1,
+                maximum: 5,
+                description: "Importance score from 1-5, defaults to 1",
+              },
+            },
+            required: ["content"],
+          },
+        },
+        {
+          name: "search_memories",
+          description: "Search for relevant memories using semantic similarity",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The query text to search for similar memories",
+              },
+              limit: {
+                type: "number",
+                description:
+                  "Maximum number of results to return, defaults to 10",
+              },
+              similarity_threshold: {
+                type: "number",
+                minimum: 0,
+                maximum: 1,
+                description:
+                  "Minimum similarity threshold (0-1), defaults to 0.7",
+              },
+              tags: {
+                type: "array",
+                items: { type: "string" },
+                description: "Optional array of tags to filter results",
+              },
+              embedding_provider: {
+                type: "string",
+                enum: ["openai", "ollama"],
+                description: "Optional embedding provider to search within",
+              },
+              embedding_model: {
+                type: "string",
+                description: "Optional specific model to filter by",
+              },
+            },
+            required: ["query"],
+          },
+        },
+        {
+          name: "list_memories",
+          description: "List memories with optional filtering",
+          inputSchema: {
+            type: "object",
+            properties: {
+              limit: {
+                type: "number",
+                description:
+                  "Maximum number of results to return, defaults to 50",
+              },
+              offset: {
+                type: "number",
+                description:
+                  "Number of results to skip for pagination, defaults to 0",
+              },
+              tags: {
+                type: "array",
+                items: { type: "string" },
+                description: "Optional array of tags to filter by",
+              },
+              min_importance: {
+                type: "number",
+                minimum: 1,
+                maximum: 5,
+                description: "Minimum importance score to include",
+              },
+              start_date: {
+                type: "string",
+                description: "Start date for filtering (ISO string format)",
+              },
+              end_date: {
+                type: "string",
+                description: "End date for filtering (ISO string format)",
+              },
+              embedding_provider: {
+                type: "string",
+                enum: ["openai", "ollama"],
+                description: "Optional embedding provider to filter by",
+              },
+            },
+            required: [],
+          },
+        },
+        {
+          name: "delete_memory",
+          description: "Delete a memory by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              memory_id: {
+                type: "number",
+                description: "The ID of the memory to delete",
+              },
+            },
+            required: ["memory_id"],
+          },
+        },
+        {
+          name: "get_memory_stats",
+          description: "Get statistics about stored memories",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+      ],
+    }));
+
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      try {
+        switch (request.params.name) {
+          case "store_memory":
+            return await this.handleStoreMemory(request.params.arguments);
+
+          case "search_memories":
+            return await this.handleSearchMemories(request.params.arguments);
+
+          case "list_memories":
+            return await this.handleListMemories(request.params.arguments);
+
+          case "delete_memory":
+            return await this.handleDeleteMemory(request.params.arguments);
+
+          case "get_memory_stats":
+            return await this.handleGetMemoryStats();
+
+          default:
+            throw new McpError(
+              ErrorCode.MethodNotFound,
+              `Unknown tool: ${request.params.name}`
+            );
+        }
+      } catch (error) {
+        console.error(`Error in ${request.params.name}:`, error);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: ${
+                error instanceof Error ? error.message : "Unknown error"
+              }`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    });
+  }
+
+  /**
+   * Handle store_memory tool
+   */
+  private async handleStoreMemory(args: unknown) {
+    if (!isValidStoreMemoryArgs(args)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        "Invalid store_memory arguments"
+      );
+    }
+
+    // Generate embedding for the content
+    const embedding = await this.embeddings.generateEmbedding(args.content);
+
+    // Store in database with embedding metadata
+    const memory = await this.database.storeMemory(
+      args,
+      embedding,
+      this.embeddings.getModel(),
+      this.embeddings.getProvider()
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              memory: {
+                id: memory.id,
+                content: memory.content,
+                context: memory.context,
+                tags: memory.tags,
+                importance_score: memory.importance_score,
+                embedding_model: memory.embedding_model,
+                embedding_provider: memory.embedding_provider,
+                created_at: memory.created_at,
+              },
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle search_memories tool
+   */
+  private async handleSearchMemories(args: unknown) {
+    if (!isValidSearchMemoriesArgs(args)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        "Invalid search_memories arguments"
+      );
+    }
+
+    // Generate embedding for the query
+    const queryEmbedding = await this.embeddings.generateEmbedding(args.query);
+
+    // Search in database
+    const results = await this.database.searchMemories(
+      args,
+      queryEmbedding,
+      this.embeddings.getProvider()
+    );
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              results: results.map((result) => ({
+                memory: {
+                  id: result.memory.id,
+                  content: result.memory.content,
+                  context: result.memory.context,
+                  tags: result.memory.tags,
+                  importance_score: result.memory.importance_score,
+                  embedding_model: result.memory.embedding_model,
+                  embedding_provider: result.memory.embedding_provider,
+                  created_at: result.memory.created_at,
+                },
+                similarity_score: result.similarity_score,
+              })),
+              total_results: results.length,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle list_memories tool
+   */
+  private async handleListMemories(args: unknown) {
+    if (!isValidListMemoriesArgs(args)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        "Invalid list_memories arguments"
+      );
+    }
+
+    const memories = await this.database.listMemories(args);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              memories: memories.map((memory) => ({
+                id: memory.id,
+                content: memory.content,
+                context: memory.context,
+                tags: memory.tags,
+                importance_score: memory.importance_score,
+                created_at: memory.created_at,
+              })),
+              total_results: memories.length,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle delete_memory tool
+   */
+  private async handleDeleteMemory(args: unknown) {
+    if (!isValidDeleteMemoryArgs(args)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        "Invalid delete_memory arguments"
+      );
+    }
+
+    const deleted = await this.database.deleteMemory(args.memory_id);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: deleted,
+              message: deleted
+                ? `Memory ${args.memory_id} deleted successfully`
+                : `Memory ${args.memory_id} not found`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle get_memory_stats tool
+   */
+  private async handleGetMemoryStats() {
+    const stats = await this.database.getStats();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              stats: {
+                total_memories: stats.total_memories,
+                average_importance: stats.avg_importance,
+                unique_tags: stats.unique_tags,
+                openai_embeddings: stats.openai_embeddings,
+                ollama_embeddings: stats.ollama_embeddings,
+                current_provider: this.embeddings.getProvider(),
+                current_model: this.embeddings.getModel(),
+                current_dimensions: this.embeddings.getDimensions(),
+              },
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Test connections and start the server
+   */
+  async run() {
+    try {
+      // Test database connection
+      await this.database.testConnection();
+      console.error("Database connection successful");
+
+      // Start MCP server
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      console.error("Memory MCP server running on stdio");
+    } catch (error) {
+      console.error("Failed to start server:", error);
+      process.exit(1);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  private async cleanup() {
+    try {
+      await this.database.close();
+      await this.server.close();
+    } catch (error) {
+      console.error("Error during cleanup:", error);
+    }
+  }
+}
+
+// Start the server
+const server = new MemoryMCPServer();
+server.run().catch(console.error);
