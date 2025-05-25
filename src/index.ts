@@ -280,6 +280,15 @@ class MemoryMCPServer {
           },
         },
         {
+          name: "list_tags",
+          description: "List all unique tags used in memories",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        {
           name: "get_memory_stats",
           description: "Get statistics about stored memories",
           inputSchema: {
@@ -305,6 +314,9 @@ class MemoryMCPServer {
 
           case "delete_memory":
             return await this.handleDeleteMemory(request.params.arguments);
+
+          case "list_tags":
+            return await this.handleListTags();
 
           case "get_memory_stats":
             return await this.handleGetMemoryStats();
@@ -492,6 +504,30 @@ class MemoryMCPServer {
               message: deleted
                 ? `Memory ${args.memory_id} deleted successfully`
                 : `Memory ${args.memory_id} not found`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Handle list_tags tool
+   */
+  private async handleListTags() {
+    const tags = await this.database.listTags();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              tags: tags,
+              total_tags: tags.length,
             },
             null,
             2

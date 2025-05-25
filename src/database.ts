@@ -344,6 +344,26 @@ export class DatabaseService {
   }
 
   /**
+   * Get all unique tags used in memories
+   */
+  async listTags(): Promise<string[]> {
+    const client = await this.pool.connect();
+    try {
+      const query = `
+        SELECT DISTINCT unnest(tags) as tag
+        FROM memories
+        WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+        ORDER BY tag
+      `;
+
+      const result = await client.query(query);
+      return result.rows.map((row) => row.tag);
+    } finally {
+      client.release();
+    }
+  }
+
+  /**
    * Get memory statistics
    */
   async getStats(): Promise<{
