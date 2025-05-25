@@ -10,7 +10,7 @@ A Model Context Protocol (MCP) server for storing and retrieving coding preferen
 - **PostgreSQL with pgvector**: Efficient vector storage and similarity search
 - **Tag-based organization**: Categorize memories with custom tags
 - **Importance scoring**: Prioritize memories with 1-5 importance levels
-- **Docker support**: Easy setup with docker-compose
+- **Docker support**: Easy setup with docker compose
 
 ## Architecture
 
@@ -25,7 +25,7 @@ A Model Context Protocol (MCP) server for storing and retrieving coding preferen
 ### 1. Prerequisites
 
 - Node.js 18+ and npm
-- Docker and docker-compose
+- Docker and docker compose
 - OpenAI API key (if using OpenAI embeddings) OR Ollama running locally
 
 ### 2. Install Dependencies
@@ -66,7 +66,7 @@ EMBEDDING_DIMENSIONS=1536  # or 768 for nomic-embed-text
 ### 4. Start PostgreSQL Database
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This will start PostgreSQL with pgvector extension and automatically initialize the database schema.
@@ -251,13 +251,13 @@ npm run dev
 
 **Stop database:**
 ```bash
-docker-compose down
+docker compose down
 ```
 
 **Reset database (removes all data):**
 ```bash
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
 ## Integration Workflow
@@ -286,7 +286,7 @@ const results = await use_mcp_tool("memory-mcp", "search_memories", {
 
 ## Troubleshooting
 
-1. **Database connection issues**: Ensure PostgreSQL is running with `docker-compose ps`
+1. **Database connection issues**: Ensure PostgreSQL is running with `docker compose ps`
 2. **Embedding errors**: Check API keys and model availability
 3. **Build errors**: Run `npm install` and ensure TypeScript is properly configured
 4. **MCP connection issues**: Verify the build path in MCP settings matches the actual build output

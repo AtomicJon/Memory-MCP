@@ -9,20 +9,20 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { config } from 'dotenv';
 import { DatabaseService } from './modules/database/index.js';
-import { EmbeddingService } from './modules/embedding/index.js';
 import {
   EmbeddingConfig,
   EmbeddingProviderType,
+  EmbeddingService,
 } from './modules/embedding/index.js';
 
 // Load environment variables
 config();
 
 import {
-  isValidStoreMemoryArgs,
-  isValidSearchMemoriesArgs,
-  isValidListMemoriesArgs,
   isValidDeleteMemoryArgs,
+  isValidListMemoriesArgs,
+  isValidSearchMemoriesArgs,
+  isValidStoreMemoryArgs,
 } from './modules/server/validation.js';
 
 /**
@@ -512,12 +512,12 @@ class MemoryMCPServer {
     try {
       // Test database connection
       await this.database.testConnection();
-      console.error('Database connection successful');
+      console.info('Database connection successful');
 
       // Start MCP server
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      console.error('Memory MCP server running on stdio');
+      console.info('Memory MCP server running on stdio');
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);
