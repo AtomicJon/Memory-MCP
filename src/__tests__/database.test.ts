@@ -1,6 +1,6 @@
-import { DatabaseService } from '../modules/database/index';
-import { CreateMemoryInput } from '../modules/database/index';
-import { EmbeddingProviderType } from '../modules/embedding/index';
+import { DatabaseService } from '../modules/database/index.js';
+import { CreateMemoryInput } from '../modules/database/index.js';
+import { EmbeddingProviderType } from '../modules/embedding/index.js';
 
 // Mock data for testing
 const mockEmbeddings = {

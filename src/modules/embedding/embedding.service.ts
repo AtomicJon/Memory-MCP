@@ -3,7 +3,7 @@ import {
   EmbeddingProvider,
   EmbeddingProviderType,
 } from './embedding.types.js';
-import { createEmbeddingProvider } from './factory.js';
+import { createEmbeddingProvider } from './embedding.factory.js';
 
 /**
  * Service for managing embeddings with configurable providers

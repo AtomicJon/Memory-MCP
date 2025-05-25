@@ -23,7 +23,7 @@ import {
   isValidListMemoriesArgs,
   isValidSearchMemoriesArgs,
   isValidStoreMemoryArgs,
-} from './modules/server/validation.js';
+} from './modules/server/server.validation.js';
 
 /**
  * Memory MCP Server

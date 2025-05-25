@@ -3,8 +3,8 @@ import {
   EmbeddingProvider,
   EmbeddingProviderType,
 } from './embedding.types.js';
-import { OpenAIEmbeddingProvider } from './providers/openai.js';
-import { OllamaEmbeddingProvider } from './providers/ollama.js';
+import { OpenAIEmbeddingProvider } from './providers/openai.provider.js';
+import { OllamaEmbeddingProvider } from './providers/ollama.provider.js';
 
 /**
  * Factory function to create embedding providers based on configuration
