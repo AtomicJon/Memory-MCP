@@ -2,7 +2,7 @@ import {
   EmbeddingConfig,
   EmbeddingProvider,
   EmbeddingProviderType,
-} from '../../types.js';
+} from './embedding.types.js';
 import { createEmbeddingProvider } from './factory.js';
 
 /**

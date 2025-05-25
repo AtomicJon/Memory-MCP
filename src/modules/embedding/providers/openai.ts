@@ -1,5 +1,8 @@
 import OpenAI from 'openai';
-import { EmbeddingProvider, EmbeddingProviderType } from '../../../types.js';
+import {
+  EmbeddingProvider,
+  EmbeddingProviderType,
+} from '../embedding.types.js';
 
 /**
  * OpenAI embedding provider implementation

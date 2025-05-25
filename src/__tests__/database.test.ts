@@ -1,5 +1,6 @@
 import { DatabaseService } from '../modules/database/index';
-import { CreateMemoryInput, EmbeddingProviderType } from '../types';
+import { CreateMemoryInput } from '../modules/database/index';
+import { EmbeddingProviderType } from '../modules/embedding/index';
 
 // Mock data for testing
 const mockEmbeddings = {

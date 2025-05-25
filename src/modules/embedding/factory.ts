@@ -2,7 +2,7 @@ import {
   EmbeddingConfig,
   EmbeddingProvider,
   EmbeddingProviderType,
-} from '../../types.js';
+} from './embedding.types.js';
 import { OpenAIEmbeddingProvider } from './providers/openai.js';
 import { OllamaEmbeddingProvider } from './providers/ollama.js';
 

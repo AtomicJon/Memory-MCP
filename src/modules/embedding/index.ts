@@ -7,3 +7,4 @@ export { EmbeddingService } from './service.js';
 export { createEmbeddingProvider } from './factory.js';
 export { OpenAIEmbeddingProvider } from './providers/openai.js';
 export { OllamaEmbeddingProvider } from './providers/ollama.js';
+export * from './embedding.types.js';

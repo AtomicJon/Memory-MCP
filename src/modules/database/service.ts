@@ -6,8 +6,8 @@ import {
   MemoryWithEmbedding,
   SearchMemoryInput,
   SearchResult,
-  EmbeddingProviderType,
-} from '../../types.js';
+} from './database.types.js';
+import { EmbeddingProviderType } from '../embedding/embedding.types.js';
 
 /**
  * Database service for managing memory storage with PostgreSQL and pgvector

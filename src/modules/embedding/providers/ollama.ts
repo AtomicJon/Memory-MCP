@@ -1,5 +1,8 @@
 import { Ollama } from 'ollama';
-import { EmbeddingProvider, EmbeddingProviderType } from '../../../types.js';
+import {
+  EmbeddingProvider,
+  EmbeddingProviderType,
+} from '../embedding.types.js';
 
 /**
  * Ollama embedding provider implementation using the ollama library

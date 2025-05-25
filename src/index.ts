@@ -10,7 +10,10 @@ import {
 import { config } from 'dotenv';
 import { DatabaseService } from './modules/database/index.js';
 import { EmbeddingService } from './modules/embedding/index.js';
-import { EmbeddingConfig, EmbeddingProviderType } from './types.js';
+import {
+  EmbeddingConfig,
+  EmbeddingProviderType,
+} from './modules/embedding/index.js';
 
 // Load environment variables
 config();

@@ -2,8 +2,8 @@ import {
   CreateMemoryInput,
   SearchMemoryInput,
   ListMemoriesInput,
-  EmbeddingProviderType,
-} from '../../types.js';
+} from '../database/database.types.js';
+import { EmbeddingProviderType } from '../embedding/embedding.types.js';
 import {
   isObject,
   isString,
