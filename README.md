@@ -31,7 +31,7 @@ A Model Context Protocol (MCP) server for storing and retrieving coding preferen
 ### 2. Install Dependencies
 
 ```bash
-cd /home/jon/Documents/Cline/MCP/memory-mcp
+cd <path-to-project>/memory-mcp
 npm install
 ```
 
@@ -59,7 +59,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 OLLAMA_BASE_URL=http://localhost:11434
 
 # Model Configuration
-EMBEDDING_MODEL=text-embedding-ada-002  # or nomic-embed-text for Ollama
+EMBEDDING_MODEL=text-embedding-3-small  # or nomic-embed-text for Ollama
 EMBEDDING_DIMENSIONS=1536  # or 768 for nomic-embed-text
 ```
 
@@ -77,27 +77,81 @@ This will start PostgreSQL with pgvector extension and automatically initialize 
 npm run build
 ```
 
-### 6. Install in MCP Settings
+### 6. Install in MCP Client
 
-Add the server to your MCP settings file at `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`:
+#### For Claude Code
+
+Create or edit the `.claude.json` file in your project directory:
 
 ```json
 {
   "mcpServers": {
     "memory-mcp": {
+      "type": "stdio",
       "command": "node",
-      "args": ["/home/jon/Documents/Cline/MCP/memory-mcp/build/index.js"],
+      "args": ["<path-to-project>/memory-mcp/build/index.js"],
       "env": {
         "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
         "EMBEDDING_PROVIDER": "openai",
         "OPENAI_API_KEY": "your_openai_api_key_here",
-        "EMBEDDING_MODEL": "text-embedding-ada-002",
+        "EMBEDDING_MODEL": "text-embedding-3-small",
         "EMBEDDING_DIMENSIONS": "1536"
       }
     }
   }
 }
 ```
+
+Restart Claude Code for changes to take effect. Check MCP status with `/mcp` command.
+
+#### For Cline (VS Code Extension)
+
+1. Open the Cline extension in VS Code
+2. Click the MCP Servers icon
+3. Click "Configure MCP Servers" to open the configuration file
+4. Add the server configuration:
+
+```json
+{
+  "mcpServers": {
+    "memory-mcp": {
+      "command": "node",
+      "args": ["<path-to-project>/memory-mcp/build/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
+        "EMBEDDING_PROVIDER": "openai",
+        "OPENAI_API_KEY": "your_openai_api_key_here",
+        "EMBEDDING_MODEL": "text-embedding-3-small",
+        "EMBEDDING_DIMENSIONS": "1536"
+      }
+    }
+  }
+}
+```
+
+#### For Claude Desktop
+
+Add to your Claude Desktop MCP settings file:
+
+```json
+{
+  "mcpServers": {
+    "memory-mcp": {
+      "command": "node",
+      "args": ["<path-to-project>/memory-mcp/build/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
+        "EMBEDDING_PROVIDER": "openai",
+        "OPENAI_API_KEY": "your_openai_api_key_here",
+        "EMBEDDING_MODEL": "text-embedding-3-small",
+        "EMBEDDING_DIMENSIONS": "1536"
+      }
+    }
+  }
+}
+```
+
+**Note**: Replace `<path-to-project>` with the actual path to your memory-mcp installation directory.
 
 ## Usage
 
@@ -130,6 +184,8 @@ Search for relevant memories using semantic similarity.
 - `limit` (optional): Maximum results to return, defaults to 10
 - `similarity_threshold` (optional): Minimum similarity (0-1), defaults to 0.7
 - `tags` (optional): Filter by specific tags
+- `embedding_provider` (optional): Search within specific provider ("openai" or "ollama")
+- `embedding_model` (optional): Filter by specific embedding model
 
 **Example:**
 ```json
@@ -150,6 +206,7 @@ List memories with optional filtering.
 - `min_importance` (optional): Minimum importance score
 - `start_date` (optional): Filter by creation date (ISO string)
 - `end_date` (optional): Filter by creation date (ISO string)
+- `embedding_provider` (optional): Filter by embedding provider ("openai" or "ollama")
 
 #### 4. `delete_memory`
 Delete a memory by ID.
@@ -157,7 +214,12 @@ Delete a memory by ID.
 **Parameters:**
 - `memory_id` (required): The ID of the memory to delete
 
-#### 5. `get_memory_stats`
+#### 5. `list_tags`
+List all unique tags used in memories.
+
+Returns an array of unique tag names sorted alphabetically.
+
+#### 6. `get_memory_stats`
 Get statistics about stored memories.
 
 Returns total count, average importance, unique tags, and embedding configuration.
