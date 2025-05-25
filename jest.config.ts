@@ -7,8 +7,8 @@ module.exports = {
     "^.+\\.ts$": "ts-jest",
   },
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
-  moduleNameMapping: {
+  modulePaths: ["<rootDir>/src"],
+  moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
-  modulePaths: ["<rootDir>/src"],
 };

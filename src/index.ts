@@ -8,94 +8,25 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { config } from "dotenv";
-import { DatabaseService } from "./database.js";
-import { EmbeddingService } from "./embeddings.js";
+import { DatabaseService } from "./modules/database/index.js";
+import { EmbeddingService } from "./modules/embedding/index.js";
 import {
   CreateMemoryInput,
   EmbeddingConfig,
   ListMemoriesInput,
   SearchMemoryInput,
+  EmbeddingProviderType,
 } from "./types.js";
 
 // Load environment variables
 config();
 
-/**
- * Validates input for store_memory tool
- */
-function isValidStoreMemoryArgs(args: unknown): args is CreateMemoryInput {
-  return (
-    typeof args === "object" &&
-    args !== null &&
-    typeof (args as CreateMemoryInput).content === "string" &&
-    ((args as CreateMemoryInput).context === undefined ||
-      typeof (args as CreateMemoryInput).context === "string") &&
-    ((args as CreateMemoryInput).tags === undefined ||
-      Array.isArray((args as CreateMemoryInput).tags)) &&
-    ((args as CreateMemoryInput).importance_score === undefined ||
-      (typeof (args as CreateMemoryInput).importance_score === "number" &&
-        (args as CreateMemoryInput).importance_score! >= 1 &&
-        (args as CreateMemoryInput).importance_score! <= 5))
-  );
-}
-
-/**
- * Validates input for search_memories tool
- */
-function isValidSearchMemoriesArgs(args: unknown): args is SearchMemoryInput {
-  return (
-    typeof args === "object" &&
-    args !== null &&
-    typeof (args as SearchMemoryInput).query === "string" &&
-    ((args as SearchMemoryInput).limit === undefined ||
-      typeof (args as SearchMemoryInput).limit === "number") &&
-    ((args as SearchMemoryInput).similarity_threshold === undefined ||
-      typeof (args as SearchMemoryInput).similarity_threshold === "number") &&
-    ((args as SearchMemoryInput).tags === undefined ||
-      Array.isArray((args as SearchMemoryInput).tags)) &&
-    ((args as SearchMemoryInput).embedding_provider === undefined ||
-      (args as SearchMemoryInput).embedding_provider === "openai" ||
-      (args as SearchMemoryInput).embedding_provider === "ollama") &&
-    ((args as SearchMemoryInput).embedding_model === undefined ||
-      typeof (args as SearchMemoryInput).embedding_model === "string")
-  );
-}
-
-/**
- * Validates input for list_memories tool
- */
-function isValidListMemoriesArgs(args: unknown): args is ListMemoriesInput {
-  return (
-    typeof args === "object" &&
-    args !== null &&
-    ((args as ListMemoriesInput).limit === undefined ||
-      typeof (args as ListMemoriesInput).limit === "number") &&
-    ((args as ListMemoriesInput).offset === undefined ||
-      typeof (args as ListMemoriesInput).offset === "number") &&
-    ((args as ListMemoriesInput).tags === undefined ||
-      Array.isArray((args as ListMemoriesInput).tags)) &&
-    ((args as ListMemoriesInput).min_importance === undefined ||
-      typeof (args as ListMemoriesInput).min_importance === "number") &&
-    ((args as ListMemoriesInput).start_date === undefined ||
-      typeof (args as ListMemoriesInput).start_date === "string") &&
-    ((args as ListMemoriesInput).end_date === undefined ||
-      typeof (args as ListMemoriesInput).end_date === "string") &&
-    ((args as ListMemoriesInput).embedding_provider === undefined ||
-      (args as ListMemoriesInput).embedding_provider === "openai" ||
-      (args as ListMemoriesInput).embedding_provider === "ollama")
-  );
-}
-
-/**
- * Validates input for delete_memory tool
- */
-function isValidDeleteMemoryArgs(args: unknown): args is { memory_id: number } {
-  return (
-    typeof args === "object" &&
-    args !== null &&
-    typeof (args as { memory_id: number }).memory_id === "number"
-  );
-}
+import {
+  isValidStoreMemoryArgs,
+  isValidSearchMemoriesArgs,
+  isValidListMemoriesArgs,
+  isValidDeleteMemoryArgs,
+} from "./modules/server/validation.js";
 
 /**
  * Memory MCP Server
@@ -127,7 +58,9 @@ class MemoryMCPServer {
     // Initialize embedding service
     const embeddingConfig: EmbeddingConfig = {
       provider:
-        (process.env.EMBEDDING_PROVIDER as "openai" | "ollama") || "ollama",
+        process.env.EMBEDDING_PROVIDER === "openai"
+          ? EmbeddingProviderType.OPENAI
+          : EmbeddingProviderType.OLLAMA,
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
       model: process.env.EMBEDDING_MODEL || "nomic-embed-text",
@@ -210,7 +143,7 @@ class MemoryMCPServer {
               },
               embedding_provider: {
                 type: "string",
-                enum: ["openai", "ollama"],
+                enum: [EmbeddingProviderType.OPENAI, EmbeddingProviderType.OLLAMA],
                 description: "Optional embedding provider to search within",
               },
               embedding_model: {
@@ -258,7 +191,7 @@ class MemoryMCPServer {
               },
               embedding_provider: {
                 type: "string",
-                enum: ["openai", "ollama"],
+                enum: [EmbeddingProviderType.OPENAI, EmbeddingProviderType.OLLAMA],
                 description: "Optional embedding provider to filter by",
               },
             },

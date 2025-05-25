@@ -26,8 +26,8 @@ export type MemoryWithEmbedding = Memory & {
   embedding: number[];
   /** The embedding model used to generate the vector */
   embedding_model: string;
-  /** The embedding provider (openai or ollama) */
-  embedding_provider: "openai" | "ollama";
+  /** The embedding provider */
+  embedding_provider: EmbeddingProviderType;
 };
 
 /**
@@ -56,8 +56,8 @@ export type SearchMemoryInput = {
   similarity_threshold?: number;
   /** Optional array of tags to filter results */
   tags?: string[];
-  /** Optional embedding provider to search within (openai or ollama) */
-  embedding_provider?: "openai" | "ollama";
+  /** Optional embedding provider to search within */
+  embedding_provider?: EmbeddingProviderType;
   /** Optional specific model to filter by */
   embedding_model?: string;
 };
@@ -89,15 +89,23 @@ export type ListMemoriesInput = {
   /** End date for filtering (ISO string format) */
   end_date?: string;
   /** Optional embedding provider to filter by */
-  embedding_provider?: "openai" | "ollama";
+  embedding_provider?: EmbeddingProviderType;
 };
+
+/**
+ * Enum for embedding provider types
+ */
+export enum EmbeddingProviderType {
+  OPENAI = "openai",
+  OLLAMA = "ollama",
+}
 
 /**
  * Configuration for embedding providers
  */
 export type EmbeddingConfig = {
   /** The embedding provider to use */
-  provider: "openai" | "ollama";
+  provider: EmbeddingProviderType;
   /** API key for OpenAI (required if provider is 'openai') */
   apiKey?: string;
   /** Base URL for Ollama API (required if provider is 'ollama') */
@@ -121,5 +129,5 @@ export interface EmbeddingProvider {
   /** Get the model name */
   getModel(): string;
   /** Get the provider type */
-  getProvider(): "openai" | "ollama";
+  getProvider(): EmbeddingProviderType;
 }
