@@ -1,5 +1,9 @@
 # Memory MCP Server
 
+> **⚠️ EXPERIMENTAL - NOT PRODUCTION READY**
+>
+> This MCP server is an experimental implementation that lacks essential security features required for production use. It has no authentication, authorization, or access controls. Use only in trusted, single-user development environments.
+
 A Model Context Protocol (MCP) server for storing and retrieving coding preferences and corrections using vector embeddings for semantic search.
 
 ## Features

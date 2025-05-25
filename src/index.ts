@@ -512,12 +512,14 @@ class MemoryMCPServer {
     try {
       // Test database connection
       await this.database.testConnection();
-      console.info('Database connection successful');
+      // Using error since MCP is using stdio transport
+      console.error('Database connection successful');
 
       // Start MCP server
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      console.info('Memory MCP server running on stdio');
+      // Using error since MCP is using stdio transport
+      console.error('Memory MCP server running on stdio');
     } catch (error) {
       console.error('Failed to start server:', error);
       process.exit(1);

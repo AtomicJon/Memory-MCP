@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { EmbeddingProviderType } from '../embedding/embedding.types.js';
 import {
   CreateMemoryInput,
   ListMemoriesInput,
@@ -7,7 +8,6 @@ import {
   SearchMemoryInput,
   SearchResult,
 } from './database.types.js';
-import { EmbeddingProviderType } from '../embedding/embedding.types.js';
 
 /**
  * Database service for managing memory storage with PostgreSQL and pgvector
