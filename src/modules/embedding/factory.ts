@@ -1,6 +1,10 @@
-import { EmbeddingConfig, EmbeddingProvider, EmbeddingProviderType } from "../../types.js";
-import { OpenAIEmbeddingProvider } from "./providers/openai.js";
-import { OllamaEmbeddingProvider } from "./providers/ollama.js";
+import {
+  EmbeddingConfig,
+  EmbeddingProvider,
+  EmbeddingProviderType,
+} from '../../types.js';
+import { OpenAIEmbeddingProvider } from './providers/openai.js';
+import { OllamaEmbeddingProvider } from './providers/ollama.js';
 
 /**
  * Factory function to create embedding providers based on configuration
@@ -10,27 +14,27 @@ import { OllamaEmbeddingProvider } from "./providers/ollama.js";
  * @throws Error if the provider type is unsupported or required configuration is missing
  */
 export function createEmbeddingProvider(
-  config: EmbeddingConfig
+  config: EmbeddingConfig,
 ): EmbeddingProvider {
   switch (config.provider) {
     case EmbeddingProviderType.OPENAI:
       if (!config.apiKey) {
-        throw new Error("OpenAI API key is required");
+        throw new Error('OpenAI API key is required');
       }
       return new OpenAIEmbeddingProvider(
         config.apiKey,
         config.model,
-        config.dimensions
+        config.dimensions,
       );
 
     case EmbeddingProviderType.OLLAMA:
       if (!config.baseUrl) {
-        throw new Error("Ollama base URL is required");
+        throw new Error('Ollama base URL is required');
       }
       return new OllamaEmbeddingProvider(
         config.baseUrl,
         config.model,
-        config.dimensions
+        config.dimensions,
       );
 
     default:

@@ -1,5 +1,9 @@
-import { EmbeddingConfig, EmbeddingProvider, EmbeddingProviderType } from "../../types.js";
-import { createEmbeddingProvider } from "./factory.js";
+import {
+  EmbeddingConfig,
+  EmbeddingProvider,
+  EmbeddingProviderType,
+} from '../../types.js';
+import { createEmbeddingProvider } from './factory.js';
 
 /**
  * Service for managing embeddings with configurable providers

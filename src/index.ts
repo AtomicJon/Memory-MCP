@@ -1,22 +1,16 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
-} from "@modelcontextprotocol/sdk/types.js";
-import { config } from "dotenv";
-import { DatabaseService } from "./modules/database/index.js";
-import { EmbeddingService } from "./modules/embedding/index.js";
-import {
-  CreateMemoryInput,
-  EmbeddingConfig,
-  ListMemoriesInput,
-  SearchMemoryInput,
-  EmbeddingProviderType,
-} from "./types.js";
+} from '@modelcontextprotocol/sdk/types.js';
+import { config } from 'dotenv';
+import { DatabaseService } from './modules/database/index.js';
+import { EmbeddingService } from './modules/embedding/index.js';
+import { EmbeddingConfig, EmbeddingProviderType } from './types.js';
 
 // Load environment variables
 config();
@@ -26,7 +20,7 @@ import {
   isValidSearchMemoriesArgs,
   isValidListMemoriesArgs,
   isValidDeleteMemoryArgs,
-} from "./modules/server/validation.js";
+} from './modules/server/validation.js';
 
 /**
  * Memory MCP Server
@@ -39,32 +33,32 @@ class MemoryMCPServer {
   constructor() {
     this.server = new Server(
       {
-        name: "memory-mcp",
-        version: "0.1.0",
+        name: 'memory-mcp',
+        version: '0.1.0',
       },
       {
         capabilities: {
           tools: {},
         },
-      }
+      },
     );
 
     // Initialize database connection
     const databaseUrl =
       process.env.DATABASE_URL ||
-      "postgresql://memory_user:memory_password@localhost:5432/memory_mcp";
+      'postgresql://memory_user:memory_password@localhost:5432/memory_mcp';
     this.database = new DatabaseService(databaseUrl);
 
     // Initialize embedding service
     const embeddingConfig: EmbeddingConfig = {
       provider:
-        process.env.EMBEDDING_PROVIDER === "openai"
+        process.env.EMBEDDING_PROVIDER === 'openai'
           ? EmbeddingProviderType.OPENAI
           : EmbeddingProviderType.OLLAMA,
       apiKey: process.env.OPENAI_API_KEY,
-      baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-      model: process.env.EMBEDDING_MODEL || "nomic-embed-text",
-      dimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || "768"),
+      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+      model: process.env.EMBEDDING_MODEL || 'nomic-embed-text',
+      dimensions: parseInt(process.env.EMBEDDING_DIMENSIONS || '768'),
     };
 
     this.embeddings = new EmbeddingService(embeddingConfig);
@@ -72,8 +66,8 @@ class MemoryMCPServer {
     this.setupToolHandlers();
 
     // Error handling
-    this.server.onerror = (error) => console.error("[MCP Error]", error);
-    process.on("SIGINT", async () => {
+    this.server.onerror = (error) => console.error('[MCP Error]', error);
+    process.on('SIGINT', async () => {
       await this.cleanup();
       process.exit(0);
     });
@@ -86,146 +80,152 @@ class MemoryMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
-          name: "store_memory",
-          description: "Store a coding preference or correction as a memory",
+          name: 'store_memory',
+          description: 'Store a coding preference or correction as a memory',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {
               content: {
-                type: "string",
-                description: "The preference or correction content to store",
+                type: 'string',
+                description: 'The preference or correction content to store',
               },
               context: {
-                type: "string",
-                description: "Optional code context where this applies",
+                type: 'string',
+                description: 'Optional code context where this applies',
               },
               tags: {
-                type: "array",
-                items: { type: "string" },
-                description: "Optional array of tags for categorization",
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional array of tags for categorization',
               },
               importance_score: {
-                type: "number",
+                type: 'number',
                 minimum: 1,
                 maximum: 5,
-                description: "Importance score from 1-5, defaults to 1",
+                description: 'Importance score from 1-5, defaults to 1',
               },
             },
-            required: ["content"],
+            required: ['content'],
           },
         },
         {
-          name: "search_memories",
-          description: "Search for relevant memories using semantic similarity",
+          name: 'search_memories',
+          description: 'Search for relevant memories using semantic similarity',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {
               query: {
-                type: "string",
-                description: "The query text to search for similar memories",
+                type: 'string',
+                description: 'The query text to search for similar memories',
               },
               limit: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Maximum number of results to return, defaults to 10",
+                  'Maximum number of results to return, defaults to 10',
               },
               similarity_threshold: {
-                type: "number",
+                type: 'number',
                 minimum: 0,
                 maximum: 1,
                 description:
-                  "Minimum similarity threshold (0-1), defaults to 0.7",
+                  'Minimum similarity threshold (0-1), defaults to 0.7',
               },
               tags: {
-                type: "array",
-                items: { type: "string" },
-                description: "Optional array of tags to filter results",
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional array of tags to filter results',
               },
               embedding_provider: {
-                type: "string",
-                enum: [EmbeddingProviderType.OPENAI, EmbeddingProviderType.OLLAMA],
-                description: "Optional embedding provider to search within",
+                type: 'string',
+                enum: [
+                  EmbeddingProviderType.OPENAI,
+                  EmbeddingProviderType.OLLAMA,
+                ],
+                description: 'Optional embedding provider to search within',
               },
               embedding_model: {
-                type: "string",
-                description: "Optional specific model to filter by",
+                type: 'string',
+                description: 'Optional specific model to filter by',
               },
             },
-            required: ["query"],
+            required: ['query'],
           },
         },
         {
-          name: "list_memories",
-          description: "List memories with optional filtering",
+          name: 'list_memories',
+          description: 'List memories with optional filtering',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {
               limit: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Maximum number of results to return, defaults to 50",
+                  'Maximum number of results to return, defaults to 50',
               },
               offset: {
-                type: "number",
+                type: 'number',
                 description:
-                  "Number of results to skip for pagination, defaults to 0",
+                  'Number of results to skip for pagination, defaults to 0',
               },
               tags: {
-                type: "array",
-                items: { type: "string" },
-                description: "Optional array of tags to filter by",
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Optional array of tags to filter by',
               },
               min_importance: {
-                type: "number",
+                type: 'number',
                 minimum: 1,
                 maximum: 5,
-                description: "Minimum importance score to include",
+                description: 'Minimum importance score to include',
               },
               start_date: {
-                type: "string",
-                description: "Start date for filtering (ISO string format)",
+                type: 'string',
+                description: 'Start date for filtering (ISO string format)',
               },
               end_date: {
-                type: "string",
-                description: "End date for filtering (ISO string format)",
+                type: 'string',
+                description: 'End date for filtering (ISO string format)',
               },
               embedding_provider: {
-                type: "string",
-                enum: [EmbeddingProviderType.OPENAI, EmbeddingProviderType.OLLAMA],
-                description: "Optional embedding provider to filter by",
+                type: 'string',
+                enum: [
+                  EmbeddingProviderType.OPENAI,
+                  EmbeddingProviderType.OLLAMA,
+                ],
+                description: 'Optional embedding provider to filter by',
               },
             },
             required: [],
           },
         },
         {
-          name: "delete_memory",
-          description: "Delete a memory by ID",
+          name: 'delete_memory',
+          description: 'Delete a memory by ID',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {
               memory_id: {
-                type: "number",
-                description: "The ID of the memory to delete",
+                type: 'number',
+                description: 'The ID of the memory to delete',
               },
             },
-            required: ["memory_id"],
+            required: ['memory_id'],
           },
         },
         {
-          name: "list_tags",
-          description: "List all unique tags used in memories",
+          name: 'list_tags',
+          description: 'List all unique tags used in memories',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {},
             required: [],
           },
         },
         {
-          name: "get_memory_stats",
-          description: "Get statistics about stored memories",
+          name: 'get_memory_stats',
+          description: 'Get statistics about stored memories',
           inputSchema: {
-            type: "object",
+            type: 'object',
             properties: {},
             required: [],
           },
@@ -236,28 +236,28 @@ class MemoryMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         switch (request.params.name) {
-          case "store_memory":
+          case 'store_memory':
             return await this.handleStoreMemory(request.params.arguments);
 
-          case "search_memories":
+          case 'search_memories':
             return await this.handleSearchMemories(request.params.arguments);
 
-          case "list_memories":
+          case 'list_memories':
             return await this.handleListMemories(request.params.arguments);
 
-          case "delete_memory":
+          case 'delete_memory':
             return await this.handleDeleteMemory(request.params.arguments);
 
-          case "list_tags":
+          case 'list_tags':
             return await this.handleListTags();
 
-          case "get_memory_stats":
+          case 'get_memory_stats':
             return await this.handleGetMemoryStats();
 
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
-              `Unknown tool: ${request.params.name}`
+              `Unknown tool: ${request.params.name}`,
             );
         }
       } catch (error) {
@@ -265,9 +265,9 @@ class MemoryMCPServer {
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: `Error: ${
-                error instanceof Error ? error.message : "Unknown error"
+                error instanceof Error ? error.message : 'Unknown error'
               }`,
             },
           ],
@@ -284,7 +284,7 @@ class MemoryMCPServer {
     if (!isValidStoreMemoryArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        "Invalid store_memory arguments"
+        'Invalid store_memory arguments',
       );
     }
 
@@ -296,13 +296,13 @@ class MemoryMCPServer {
       args,
       embedding,
       this.embeddings.getModel(),
-      this.embeddings.getProvider()
+      this.embeddings.getProvider(),
     );
 
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: true,
@@ -318,7 +318,7 @@ class MemoryMCPServer {
               },
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -332,7 +332,7 @@ class MemoryMCPServer {
     if (!isValidSearchMemoriesArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        "Invalid search_memories arguments"
+        'Invalid search_memories arguments',
       );
     }
 
@@ -343,13 +343,13 @@ class MemoryMCPServer {
     const results = await this.database.searchMemories(
       args,
       queryEmbedding,
-      this.embeddings.getProvider()
+      this.embeddings.getProvider(),
     );
 
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: true,
@@ -369,7 +369,7 @@ class MemoryMCPServer {
               total_results: results.length,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -383,7 +383,7 @@ class MemoryMCPServer {
     if (!isValidListMemoriesArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        "Invalid list_memories arguments"
+        'Invalid list_memories arguments',
       );
     }
 
@@ -392,7 +392,7 @@ class MemoryMCPServer {
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: true,
@@ -407,7 +407,7 @@ class MemoryMCPServer {
               total_results: memories.length,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -421,7 +421,7 @@ class MemoryMCPServer {
     if (!isValidDeleteMemoryArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        "Invalid delete_memory arguments"
+        'Invalid delete_memory arguments',
       );
     }
 
@@ -430,7 +430,7 @@ class MemoryMCPServer {
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: deleted,
@@ -439,7 +439,7 @@ class MemoryMCPServer {
                 : `Memory ${args.memory_id} not found`,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -455,7 +455,7 @@ class MemoryMCPServer {
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: true,
@@ -463,7 +463,7 @@ class MemoryMCPServer {
               total_tags: tags.length,
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -479,7 +479,7 @@ class MemoryMCPServer {
     return {
       content: [
         {
-          type: "text",
+          type: 'text',
           text: JSON.stringify(
             {
               success: true,
@@ -495,7 +495,7 @@ class MemoryMCPServer {
               },
             },
             null,
-            2
+            2,
           ),
         },
       ],
@@ -509,14 +509,14 @@ class MemoryMCPServer {
     try {
       // Test database connection
       await this.database.testConnection();
-      console.error("Database connection successful");
+      console.error('Database connection successful');
 
       // Start MCP server
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      console.error("Memory MCP server running on stdio");
+      console.error('Memory MCP server running on stdio');
     } catch (error) {
-      console.error("Failed to start server:", error);
+      console.error('Failed to start server:', error);
       process.exit(1);
     }
   }
@@ -529,7 +529,7 @@ class MemoryMCPServer {
       await this.database.close();
       await this.server.close();
     } catch (error) {
-      console.error("Error during cleanup:", error);
+      console.error('Error during cleanup:', error);
     }
   }
 }

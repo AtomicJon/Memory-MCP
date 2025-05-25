@@ -3,4 +3,4 @@
  * Provides generic validation utilities for type checking
  */
 
-export * from "./utils.js";
+export * from './utils.js';

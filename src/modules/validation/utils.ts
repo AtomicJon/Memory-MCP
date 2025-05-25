@@ -9,7 +9,7 @@
  * @returns True if the value is a plain object, false otherwise
  */
 export function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 /**
@@ -18,7 +18,7 @@ export function isObject(value: unknown): value is Record<string, unknown> {
  * @returns True if the value is a string, false otherwise
  */
 export function isString(value: unknown): value is string {
-  return typeof value === "string";
+  return typeof value === 'string';
 }
 
 /**
@@ -27,7 +27,7 @@ export function isString(value: unknown): value is string {
  * @returns True if the value is a number, false otherwise
  */
 export function isNumber(value: unknown): value is number {
-  return typeof value === "number";
+  return typeof value === 'number';
 }
 
 /**
@@ -62,7 +62,9 @@ export function isArray(value: unknown): value is unknown[] {
  * @param value - The value to check
  * @returns True if the value is an array or undefined, false otherwise
  */
-export function isOptionalArray(value: unknown): value is unknown[] | undefined {
+export function isOptionalArray(
+  value: unknown,
+): value is unknown[] | undefined {
   return value === undefined || isArray(value);
 }
 
@@ -80,7 +82,9 @@ export function isStringArray(value: unknown): value is string[] {
  * @param value - The value to check
  * @returns True if the value is an array of strings or undefined, false otherwise
  */
-export function isOptionalStringArray(value: unknown): value is string[] | undefined {
+export function isOptionalStringArray(
+  value: unknown,
+): value is string[] | undefined {
   return value === undefined || isStringArray(value);
 }
 
@@ -92,7 +96,7 @@ export function isOptionalStringArray(value: unknown): value is string[] | undef
  */
 export function isEnumValue<T extends Record<string, string>>(
   value: unknown,
-  enumObj: T
+  enumObj: T,
 ): value is T[keyof T] {
   return Object.values(enumObj).includes(value as T[keyof T]);
 }
@@ -105,7 +109,7 @@ export function isEnumValue<T extends Record<string, string>>(
  */
 export function isOptionalEnumValue<T extends Record<string, string>>(
   value: unknown,
-  enumObj: T
+  enumObj: T,
 ): value is T[keyof T] | undefined {
   return value === undefined || isEnumValue(value, enumObj);
 }
@@ -120,7 +124,7 @@ export function isOptionalEnumValue<T extends Record<string, string>>(
 export function isNumberInRange(
   value: unknown,
   min: number,
-  max: number
+  max: number,
 ): value is number {
   return isNumber(value) && value >= min && value <= max;
 }
@@ -135,7 +139,7 @@ export function isNumberInRange(
 export function isOptionalNumberInRange(
   value: unknown,
   min: number,
-  max: number
+  max: number,
 ): value is number | undefined {
   return value === undefined || isNumberInRange(value, min, max);
 }

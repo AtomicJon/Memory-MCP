@@ -1,5 +1,5 @@
-import OpenAI from "openai";
-import { EmbeddingProvider, EmbeddingProviderType } from "../../../types.js";
+import OpenAI from 'openai';
+import { EmbeddingProvider, EmbeddingProviderType } from '../../../types.js';
 
 /**
  * OpenAI embedding provider implementation
@@ -39,8 +39,8 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
     } catch (error) {
       throw new Error(
         `OpenAI embedding error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       );
     }
   }
@@ -59,13 +59,13 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       });
 
       return response.data.map(
-        (item: { embedding: number[] }) => item.embedding
+        (item: { embedding: number[] }) => item.embedding,
       );
     } catch (error) {
       throw new Error(
         `OpenAI embeddings error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       );
     }
   }

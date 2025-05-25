@@ -1,5 +1,5 @@
-import { Ollama } from "ollama";
-import { EmbeddingProvider, EmbeddingProviderType } from "../../../types.js";
+import { Ollama } from 'ollama';
+import { EmbeddingProvider, EmbeddingProviderType } from '../../../types.js';
 
 /**
  * Ollama embedding provider implementation using the ollama library
@@ -36,15 +36,15 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
       });
 
       if (!response.embedding || !Array.isArray(response.embedding)) {
-        throw new Error("Invalid response: missing or invalid embedding");
+        throw new Error('Invalid response: missing or invalid embedding');
       }
 
       return response.embedding;
     } catch (error) {
       throw new Error(
         `Ollama embedding error: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
       );
     }
   }

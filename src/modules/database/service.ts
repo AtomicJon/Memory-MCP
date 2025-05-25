@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool } from 'pg';
 import {
   CreateMemoryInput,
   ListMemoriesInput,
@@ -7,7 +7,7 @@ import {
   SearchMemoryInput,
   SearchResult,
   EmbeddingProviderType,
-} from "../../types.js";
+} from '../../types.js';
 
 /**
  * Database service for managing memory storage with PostgreSQL and pgvector
@@ -36,7 +36,7 @@ export class DatabaseService {
   async testConnection(): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query("SELECT 1");
+      await client.query('SELECT 1');
     } finally {
       client.release();
     }
@@ -55,11 +55,11 @@ export class DatabaseService {
     input: CreateMemoryInput,
     embedding: number[],
     embeddingModel: string,
-    embeddingProvider: EmbeddingProviderType
+    embeddingProvider: EmbeddingProviderType,
   ): Promise<MemoryWithEmbedding> {
     const client = await this.pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query('BEGIN');
 
       const memoryQuery = `
         INSERT INTO memories (content, context, tags, importance_score)
@@ -89,7 +89,7 @@ export class DatabaseService {
         embeddingModel,
       ]);
 
-      await client.query("COMMIT");
+      await client.query('COMMIT');
 
       return {
         id: memory.id,
@@ -104,7 +104,7 @@ export class DatabaseService {
         embedding_provider: embeddingProvider,
       };
     } catch (error) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
@@ -122,7 +122,7 @@ export class DatabaseService {
   async searchMemories(
     input: SearchMemoryInput,
     queryEmbedding: number[],
-    embeddingProvider: EmbeddingProviderType
+    embeddingProvider: EmbeddingProviderType,
   ): Promise<SearchResult[]> {
     const client = await this.pool.connect();
     try {
@@ -308,7 +308,7 @@ export class DatabaseService {
    */
   async getMemoryWithEmbeddingById(
     id: number,
-    embeddingProvider: EmbeddingProviderType
+    embeddingProvider: EmbeddingProviderType,
   ): Promise<MemoryWithEmbedding | null> {
     const client = await this.pool.connect();
     try {
@@ -355,7 +355,7 @@ export class DatabaseService {
   async deleteMemory(id: number): Promise<boolean> {
     const client = await this.pool.connect();
     try {
-      const query = "DELETE FROM memories WHERE id = $1";
+      const query = 'DELETE FROM memories WHERE id = $1';
       const result = await client.query(query, [id]);
       return result.rowCount !== null && result.rowCount > 0;
     } finally {

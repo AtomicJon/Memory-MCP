@@ -3,7 +3,7 @@ import {
   SearchMemoryInput,
   ListMemoriesInput,
   EmbeddingProviderType,
-} from "../../types.js";
+} from '../../types.js';
 import {
   isObject,
   isString,
@@ -12,7 +12,7 @@ import {
   isOptionalNumberInRange,
   isOptionalNumber,
   isOptionalEnumValue,
-} from "../validation/index.js";
+} from '../validation/index.js';
 
 /**
  * Domain-specific validation functions for MCP server tool arguments
@@ -24,7 +24,9 @@ import {
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid CreateMemoryInput, false otherwise
  */
-export function isValidStoreMemoryArgs(args: unknown): args is CreateMemoryInput {
+export function isValidStoreMemoryArgs(
+  args: unknown,
+): args is CreateMemoryInput {
   if (!isObject(args)) return false;
 
   const input = args as CreateMemoryInput;
@@ -42,7 +44,9 @@ export function isValidStoreMemoryArgs(args: unknown): args is CreateMemoryInput
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid SearchMemoryInput, false otherwise
  */
-export function isValidSearchMemoriesArgs(args: unknown): args is SearchMemoryInput {
+export function isValidSearchMemoriesArgs(
+  args: unknown,
+): args is SearchMemoryInput {
   if (!isObject(args)) return false;
 
   const input = args as SearchMemoryInput;
@@ -62,7 +66,9 @@ export function isValidSearchMemoriesArgs(args: unknown): args is SearchMemoryIn
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid ListMemoriesInput, false otherwise
  */
-export function isValidListMemoriesArgs(args: unknown): args is ListMemoriesInput {
+export function isValidListMemoriesArgs(
+  args: unknown,
+): args is ListMemoriesInput {
   if (!isObject(args)) return false;
 
   const input = args as ListMemoriesInput;
@@ -83,9 +89,11 @@ export function isValidListMemoriesArgs(args: unknown): args is ListMemoriesInpu
  * @param args - Unknown input arguments to validate
  * @returns True if args contains a valid memory_id number, false otherwise
  */
-export function isValidDeleteMemoryArgs(args: unknown): args is { memory_id: number } {
+export function isValidDeleteMemoryArgs(
+  args: unknown,
+): args is { memory_id: number } {
   if (!isObject(args)) return false;
 
   const input = args as { memory_id: number };
-  return typeof input.memory_id === "number";
+  return typeof input.memory_id === 'number';
 }

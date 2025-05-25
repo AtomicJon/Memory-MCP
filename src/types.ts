@@ -96,8 +96,8 @@ export type ListMemoriesInput = {
  * Enum for embedding provider types
  */
 export enum EmbeddingProviderType {
-  OPENAI = "openai",
-  OLLAMA = "ollama",
+  OPENAI = 'openai',
+  OLLAMA = 'ollama',
 }
 
 /**
