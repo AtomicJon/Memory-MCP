@@ -11,15 +11,15 @@ A Model Context Protocol (MCP) server for storing and retrieving coding preferen
 - **Store coding memories**: Save preferences, corrections, and best practices with contextual information
 - **Semantic search**: Find relevant memories using vector similarity search
 - **Configurable embeddings**: Support for both OpenAI and Ollama embedding providers
-- **PostgreSQL with pgvector**: Efficient vector storage and similarity search
+- **PGlite embedded database**: Lightweight, embedded PostgreSQL with vector support
 - **Tag-based organization**: Categorize memories with custom tags
 - **Importance scoring**: Prioritize memories with 1-5 importance levels
-- **Docker support**: Easy setup with docker compose
+- **Zero-dependency setup**: No Docker or external database required
 
 ## Architecture
 
 - **TypeScript MCP Server**: Implements the Model Context Protocol
-- **PostgreSQL + pgvector**: Vector database for storing embeddings
+- **PGlite**: Embedded PostgreSQL database with vector extensions
 - **Configurable Embedding Providers**:
   - OpenAI (text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large)
   - Ollama (nomic-embed-text, mxbai-embed-large, etc.)
@@ -29,7 +29,6 @@ A Model Context Protocol (MCP) server for storing and retrieving coding preferen
 ### 1. Prerequisites
 
 - Node.js 18+ and npm
-- Docker and docker compose
 - OpenAI API key (if using OpenAI embeddings) OR Ollama running locally
 
 ### 2. Install Dependencies
@@ -51,7 +50,7 @@ Edit `.env` with your configuration:
 
 ```env
 # Database Configuration
-DATABASE_URL=postgresql://memory_user:memory_password@localhost:5432/memory_mcp
+PGLITE_DATA_DIR=./db_data
 
 # Embedding Provider Configuration
 EMBEDDING_PROVIDER=openai  # or "ollama"
@@ -67,21 +66,15 @@ EMBEDDING_MODEL=text-embedding-3-small  # or nomic-embed-text for Ollama
 EMBEDDING_DIMENSIONS=1536  # or 768 for nomic-embed-text
 ```
 
-### 4. Start PostgreSQL Database
-
-```bash
-docker compose up -d
-```
-
-This will start PostgreSQL with pgvector extension and automatically initialize the database schema.
-
-### 5. Build the MCP Server
+### 4. Build the MCP Server
 
 ```bash
 npm run build
 ```
 
-### 6. Install in MCP Client
+The database will be automatically initialized on first run. If you specify `PGLITE_DATA_DIR`, the database will persist to that directory; otherwise it will run in-memory.
+
+### 5. Install in MCP Client
 
 #### For Claude Code
 
@@ -95,7 +88,7 @@ Create or edit the `.claude.json` file in your project directory:
       "command": "node",
       "args": ["<path-to-project>/memory-mcp/build/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
+        "PGLITE_DATA_DIR": "./db_data",
         "EMBEDDING_PROVIDER": "openai",
         "OPENAI_API_KEY": "your_openai_api_key_here",
         "EMBEDDING_MODEL": "text-embedding-3-small",
@@ -122,7 +115,7 @@ Restart Claude Code for changes to take effect. Check MCP status with `/mcp` com
       "command": "node",
       "args": ["<path-to-project>/memory-mcp/build/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
+        "PGLITE_DATA_DIR": "./db_data",
         "EMBEDDING_PROVIDER": "openai",
         "OPENAI_API_KEY": "your_openai_api_key_here",
         "EMBEDDING_MODEL": "text-embedding-3-small",
@@ -144,7 +137,7 @@ Add to your Claude Desktop MCP settings file:
       "command": "node",
       "args": ["<path-to-project>/memory-mcp/build/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://memory_user:memory_password@localhost:5432/memory_mcp",
+        "PGLITE_DATA_DIR": "./db_data",
         "EMBEDDING_PROVIDER": "openai",
         "OPENAI_API_KEY": "your_openai_api_key_here",
         "EMBEDDING_MODEL": "text-embedding-3-small",
@@ -161,14 +154,14 @@ Add to your Claude Desktop MCP settings file:
 
 ### Available Tools
 
-#### 1. `store_memory`
+#### 1. `storeMemory`
 Store a coding preference or correction as a memory.
 
 **Parameters:**
 - `content` (required): The preference or correction content
 - `context` (optional): Code context where this applies
 - `tags` (optional): Array of categorization tags
-- `importance_score` (optional): Importance level 1-5, defaults to 1
+- `importanceScore` (optional): Importance level 1-5, defaults to 1
 
 **Example:**
 ```json
@@ -176,20 +169,20 @@ Store a coding preference or correction as a memory.
   "content": "Always use async/await instead of .then() chains for better readability",
   "context": "JavaScript Promise handling in React components",
   "tags": ["javascript", "promises", "react", "best-practices"],
-  "importance_score": 4
+  "importanceScore": 4
 }
 ```
 
-#### 2. `search_memories`
+#### 2. `searchMemories`
 Search for relevant memories using semantic similarity.
 
 **Parameters:**
 - `query` (required): The search query
 - `limit` (optional): Maximum results to return, defaults to 10
-- `similarity_threshold` (optional): Minimum similarity (0-1), defaults to 0.7
+- `similarityThreshold` (optional): Minimum similarity (0-1), defaults to 0.7
 - `tags` (optional): Filter by specific tags
-- `embedding_provider` (optional): Search within specific provider ("openai" or "ollama")
-- `embedding_model` (optional): Filter by specific embedding model
+- `embeddingProvider` (optional): Search within specific provider ("openai" or "ollama")
+- `embeddingModel` (optional): Filter by specific embedding model
 
 **Example:**
 ```json
@@ -200,30 +193,30 @@ Search for relevant memories using semantic similarity.
 }
 ```
 
-#### 3. `list_memories`
+#### 3. `listMemories`
 List memories with optional filtering.
 
 **Parameters:**
 - `limit` (optional): Maximum results, defaults to 50
 - `offset` (optional): Pagination offset, defaults to 0
 - `tags` (optional): Filter by tags
-- `min_importance` (optional): Minimum importance score
-- `start_date` (optional): Filter by creation date (ISO string)
-- `end_date` (optional): Filter by creation date (ISO string)
-- `embedding_provider` (optional): Filter by embedding provider ("openai" or "ollama")
+- `minImportance` (optional): Minimum importance score
+- `startDate` (optional): Filter by creation date (ISO string)
+- `endDate` (optional): Filter by creation date (ISO string)
+- `embeddingProvider` (optional): Filter by embedding provider ("openai" or "ollama")
 
-#### 4. `delete_memory`
+#### 4. `deleteMemory`
 Delete a memory by ID.
 
 **Parameters:**
-- `memory_id` (required): The ID of the memory to delete
+- `memoryId` (required): The ID of the memory to delete
 
-#### 5. `list_tags`
+#### 5. `listTags`
 List all unique tags used in memories.
 
 Returns an array of unique tag names sorted alphabetically.
 
-#### 6. `get_memory_stats`
+#### 6. `getMemoryStats`
 Get statistics about stored memories.
 
 Returns total count, average importance, unique tags, and embedding configuration.
@@ -251,38 +244,39 @@ npm run build
 npm run dev
 ```
 
+### Testing
+```bash
+npm test
+```
+
 ### Database Management
 
-**Stop database:**
-```bash
-docker compose down
-```
+The database is automatically managed by PGlite. Data is stored in the directory specified by `PGLITE_DATA_DIR` (defaults to in-memory if not specified).
 
 **Reset database (removes all data):**
 ```bash
-docker compose down -v
-docker compose up -d
+rm -rf ./db_data
 ```
 
 ## Integration Workflow
 
-1. **Correction Phase**: When a coding agent is corrected, call `store_memory` with the preference
-2. **Coding Phase**: Before making decisions, call `search_memories` with current context
+1. **Correction Phase**: When a coding agent is corrected, call `storeMemory` with the preference
+2. **Coding Phase**: Before making decisions, call `searchMemories` with current context
 3. **Learning**: System builds up a knowledge base of coding preferences over time
 
 ## Example Usage in Practice
 
 ```javascript
 // Store a memory when corrected
-await use_mcp_tool("memory-mcp", "store_memory", {
+await use_mcp_tool("memory-mcp", "storeMemory", {
   content: "Use TypeScript strict mode and avoid 'any' type",
   context: "TypeScript configuration and type safety",
   tags: ["typescript", "configuration", "types"],
-  importance_score: 5
+  importanceScore: 5
 });
 
 // Search for relevant memories before coding
-const results = await use_mcp_tool("memory-mcp", "search_memories", {
+const results = await use_mcp_tool("memory-mcp", "searchMemories", {
   query: "TypeScript configuration best practices",
   limit: 3
 });
@@ -290,7 +284,7 @@ const results = await use_mcp_tool("memory-mcp", "search_memories", {
 
 ## Troubleshooting
 
-1. **Database connection issues**: Ensure PostgreSQL is running with `docker compose ps`
+1. **Database issues**: The database is automatically created and managed. Check file permissions if using `PGLITE_DATA_DIR`
 2. **Embedding errors**: Check API keys and model availability
 3. **Build errors**: Run `npm install` and ensure TypeScript is properly configured
 4. **MCP connection issues**: Verify the build path in MCP settings matches the actual build output
