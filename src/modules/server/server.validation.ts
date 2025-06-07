@@ -20,7 +20,7 @@ import {
  */
 
 /**
- * Validates arguments for the store_memory tool
+ * Validates arguments for the storeMemory tool
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid CreateMemoryInput, false otherwise
  */
@@ -35,12 +35,12 @@ export function isValidStoreMemoryArgs(
     isString(input.content) &&
     isOptionalString(input.context) &&
     isOptionalStringArray(input.tags) &&
-    isOptionalNumberInRange(input.importance_score, 1, 5)
+    isOptionalNumberInRange(input.importanceScore, 1, 5)
   );
 }
 
 /**
- * Validates arguments for the search_memories tool
+ * Validates arguments for the searchMemories tool
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid SearchMemoryInput, false otherwise
  */
@@ -54,15 +54,15 @@ export function isValidSearchMemoriesArgs(
   return (
     isString(input.query) &&
     isOptionalNumber(input.limit) &&
-    isOptionalNumber(input.similarity_threshold) &&
+    isOptionalNumber(input.similarityThreshold) &&
     isOptionalStringArray(input.tags) &&
-    isOptionalEnumValue(input.embedding_provider, EmbeddingProviderType) &&
-    isOptionalString(input.embedding_model)
+    isOptionalEnumValue(input.embeddingProvider, EmbeddingProviderType) &&
+    isOptionalString(input.embeddingModel)
   );
 }
 
 /**
- * Validates arguments for the list_memories tool
+ * Validates arguments for the listMemories tool
  * @param args - Unknown input arguments to validate
  * @returns True if args is a valid ListMemoriesInput, false otherwise
  */
@@ -77,23 +77,23 @@ export function isValidListMemoriesArgs(
     isOptionalNumber(input.limit) &&
     isOptionalNumber(input.offset) &&
     isOptionalStringArray(input.tags) &&
-    isOptionalNumber(input.min_importance) &&
-    isOptionalString(input.start_date) &&
-    isOptionalString(input.end_date) &&
-    isOptionalEnumValue(input.embedding_provider, EmbeddingProviderType)
+    isOptionalNumber(input.minImportance) &&
+    isOptionalString(input.startDate) &&
+    isOptionalString(input.endDate) &&
+    isOptionalEnumValue(input.embeddingProvider, EmbeddingProviderType)
   );
 }
 
 /**
- * Validates arguments for the delete_memory tool
+ * Validates arguments for the deleteMemory tool
  * @param args - Unknown input arguments to validate
- * @returns True if args contains a valid memory_id number, false otherwise
+ * @returns True if args contains a valid memoryId number, false otherwise
  */
 export function isValidDeleteMemoryArgs(
   args: unknown,
-): args is { memory_id: number } {
+): args is { memoryId: number } {
   if (!isObject(args)) return false;
 
-  const input = args as { memory_id: number };
-  return typeof input.memory_id === 'number';
+  const input = args as { memoryId: number };
+  return typeof input.memoryId === 'number';
 }

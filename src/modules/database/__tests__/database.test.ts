@@ -1,33 +1,35 @@
-import { DatabaseService } from '../modules/database/index.js';
-import { CreateMemoryInput } from '../modules/database/index.js';
-import { EmbeddingProviderType } from '../modules/embedding/index.js';
+import { EmbeddingProviderType } from '../../embedding/embedding.types.js';
+import { DatabaseService } from '../database.service.js';
+import { CreateMemoryInput, SearchMemoryInput } from '../database.types.js';
 
 // Mock data for testing
 const mockEmbeddings = {
   openai: {
     model: 'text-embedding-3-small',
     provider: EmbeddingProviderType.OPENAI,
-    vector: new Array(1536).fill(0).map(() => Math.random()),
+    vector: new Array(1536)
+      .fill(0)
+      .map(() => Math.round(Math.random() * 100000) / 100000),
   },
   ollama: {
     model: 'nomic-embed-text',
     provider: EmbeddingProviderType.OLLAMA,
-    vector: new Array(768).fill(0).map(() => Math.random()),
+    vector: new Array(768)
+      .fill(0)
+      .map(() => Math.round(Math.random() * 100000) / 100000),
   },
 };
 
 describe('DatabaseService Multi-Embedding Support', () => {
   let database: DatabaseService;
-  const testDatabaseUrl =
-    process.env.TEST_DATABASE_URL ||
-    'postgresql://memory_user:memory_password@localhost:5432/memory_mcp_test';
 
   beforeAll(async () => {
-    // Arrange
-    database = new DatabaseService(testDatabaseUrl);
+    // Arrange - Use in-memory PGlite database for testing
+    database = new DatabaseService(); // No dataDir = in-memory
 
-    // Ensure database connection works
+    // Ensure database connection works and initialize schema
     await database.testConnection();
+    await database.initializeSchema();
   });
 
   afterAll(async () => {
@@ -48,7 +50,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
         content: 'Test memory with OpenAI embedding',
         context: 'Testing context',
         tags: ['test', 'openai'],
-        importance_score: 3,
+        importanceScore: 3,
       };
 
       // Act
@@ -63,8 +65,8 @@ describe('DatabaseService Multi-Embedding Support', () => {
       expect(result).toBeDefined();
       expect(result.id).toBeGreaterThan(0);
       expect(result.content).toBe(memoryInput.content);
-      expect(result.embedding_model).toBe(mockEmbeddings.openai.model);
-      expect(result.embedding_provider).toBe(mockEmbeddings.openai.provider);
+      expect(result.embeddingModel).toBe(mockEmbeddings.openai.model);
+      expect(result.embeddingProvider).toBe(mockEmbeddings.openai.provider);
       expect(result.embedding).toEqual(mockEmbeddings.openai.vector);
     });
 
@@ -74,7 +76,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
         content: 'Test memory with Ollama embedding',
         context: 'Testing context',
         tags: ['test', 'ollama'],
-        importance_score: 4,
+        importanceScore: 4,
       };
 
       // Act
@@ -89,8 +91,8 @@ describe('DatabaseService Multi-Embedding Support', () => {
       expect(result).toBeDefined();
       expect(result.id).toBeGreaterThan(0);
       expect(result.content).toBe(memoryInput.content);
-      expect(result.embedding_model).toBe(mockEmbeddings.ollama.model);
-      expect(result.embedding_provider).toBe(mockEmbeddings.ollama.provider);
+      expect(result.embeddingModel).toBe(mockEmbeddings.ollama.model);
+      expect(result.embeddingProvider).toBe(mockEmbeddings.ollama.provider);
       expect(result.embedding).toEqual(mockEmbeddings.ollama.vector);
     });
   });
@@ -102,7 +104,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
         {
           content: 'OpenAI test memory for search',
           tags: ['search', 'openai'],
-          importance_score: 3,
+          importanceScore: 3,
         },
         mockEmbeddings.openai.vector,
         mockEmbeddings.openai.model,
@@ -113,7 +115,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
         {
           content: 'Ollama test memory for search',
           tags: ['search', 'ollama'],
-          importance_score: 4,
+          importanceScore: 4,
         },
         mockEmbeddings.ollama.vector,
         mockEmbeddings.ollama.model,
@@ -123,10 +125,10 @@ describe('DatabaseService Multi-Embedding Support', () => {
 
     it('should search within OpenAI embeddings only', async () => {
       // Arrange
-      const searchInput = {
+      const searchInput: SearchMemoryInput = {
         query: 'test search',
-        embedding_provider: EmbeddingProviderType.OPENAI,
-        similarity_threshold: 0.0, // Low threshold for testing
+        embeddingProvider: EmbeddingProviderType.OPENAI,
+        similarityThreshold: 0.0, // Low threshold for testing
       };
 
       // Act
@@ -140,11 +142,11 @@ describe('DatabaseService Multi-Embedding Support', () => {
       expect(results).toBeDefined();
       expect(results.length).toBeGreaterThan(0);
       results.forEach((result) => {
-        expect(result.memory.embedding_provider).toBe(
+        expect(result.memory.embeddingProvider).toBe(
           EmbeddingProviderType.OPENAI,
         );
-        expect(result.similarity_score).toBeGreaterThanOrEqual(0);
-        expect(result.similarity_score).toBeLessThanOrEqual(1);
+        expect(result.similarityScore).toBeGreaterThanOrEqual(0);
+        expect(result.similarityScore).toBeLessThanOrEqual(1);
       });
     });
 
@@ -152,7 +154,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
       // Arrange
       const searchInput = {
         query: 'test search',
-        embedding_provider: EmbeddingProviderType.OLLAMA,
+        embeddingProvider: EmbeddingProviderType.OLLAMA,
         similarity_threshold: 0.0, // Low threshold for testing
       };
 
@@ -167,11 +169,11 @@ describe('DatabaseService Multi-Embedding Support', () => {
       expect(results).toBeDefined();
       expect(results.length).toBeGreaterThan(0);
       results.forEach((result) => {
-        expect(result.memory.embedding_provider).toBe(
+        expect(result.memory.embeddingProvider).toBe(
           EmbeddingProviderType.OLLAMA,
         );
-        expect(result.similarity_score).toBeGreaterThanOrEqual(0);
-        expect(result.similarity_score).toBeLessThanOrEqual(1);
+        expect(result.similarityScore).toBeGreaterThanOrEqual(0);
+        expect(result.similarityScore).toBeLessThanOrEqual(1);
       });
     });
 
@@ -179,8 +181,8 @@ describe('DatabaseService Multi-Embedding Support', () => {
       // Arrange
       const searchInput = {
         query: 'test search',
-        embedding_provider: EmbeddingProviderType.OPENAI,
-        embedding_model: mockEmbeddings.openai.model,
+        embeddingProvider: EmbeddingProviderType.OPENAI,
+        embeddingModel: mockEmbeddings.openai.model,
         similarity_threshold: 0.0,
       };
 
@@ -194,7 +196,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
       // Assert
       expect(results).toBeDefined();
       results.forEach((result) => {
-        expect(result.memory.embedding_model).toBe(mockEmbeddings.openai.model);
+        expect(result.memory.embeddingModel).toBe(mockEmbeddings.openai.model);
       });
     });
   });
@@ -241,7 +243,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
     it('should filter memories by embedding provider', async () => {
       // Arrange
       const listInput = {
-        embedding_provider: EmbeddingProviderType.OPENAI,
+        embeddingProvider: EmbeddingProviderType.OPENAI,
         limit: 10,
       };
 
@@ -262,7 +264,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
       await database.storeMemory(
         {
           content: 'OpenAI memory for stats',
-          importance_score: 3,
+          importanceScore: 3,
         },
         mockEmbeddings.openai.vector,
         mockEmbeddings.openai.model,
@@ -272,7 +274,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
       await database.storeMemory(
         {
           content: 'Ollama memory for stats',
-          importance_score: 4,
+          importanceScore: 4,
         },
         mockEmbeddings.ollama.vector,
         mockEmbeddings.ollama.model,
@@ -286,12 +288,12 @@ describe('DatabaseService Multi-Embedding Support', () => {
 
       // Assert
       expect(stats).toBeDefined();
-      expect(typeof stats.total_memories).toBe('number');
-      expect(typeof stats.avg_importance).toBe('number');
-      expect(Array.isArray(stats.unique_tags)).toBe(true);
-      expect(typeof stats.openai_embeddings).toBe('number');
-      expect(typeof stats.ollama_embeddings).toBe('number');
-      expect(stats.total_memories).toBeGreaterThan(0);
+      expect(typeof stats.totalMemories).toBe('number');
+      expect(typeof stats.avgImportance).toBe('number');
+      expect(Array.isArray(stats.uniqueTags)).toBe(true);
+      expect(typeof stats.openaiEmbeddings).toBe('number');
+      expect(typeof stats.ollamaEmbeddings).toBe('number');
+      expect(stats.totalMemories).toBeGreaterThan(0);
     });
   });
 
@@ -322,8 +324,8 @@ describe('DatabaseService Multi-Embedding Support', () => {
       // Assert
       expect(memory).toBeDefined();
       expect(memory!.id).toBe(testMemoryId);
-      expect(memory!.embedding_provider).toBe(EmbeddingProviderType.OPENAI);
-      expect(memory!.embedding_model).toBe(mockEmbeddings.openai.model);
+      expect(memory!.embeddingProvider).toBe(EmbeddingProviderType.OPENAI);
+      expect(memory!.embeddingModel).toBe(mockEmbeddings.openai.model);
       expect(memory!.embedding).toEqual(mockEmbeddings.openai.vector);
     });
 

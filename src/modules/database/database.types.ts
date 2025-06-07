@@ -1,36 +1,5 @@
 import { EmbeddingProviderType } from '../embedding/embedding.types.js';
-
-/**
- * Represents a stored memory entry in the database
- */
-export type Memory = {
-  /** Unique identifier for the memory */
-  id: number;
-  /** The actual preference or correction content */
-  content: string;
-  /** Optional code context where this memory applies */
-  context?: string;
-  /** Array of categorization tags for organizing memories */
-  tags: string[];
-  /** Timestamp when the memory was created */
-  created_at: Date;
-  /** Timestamp when the memory was last updated */
-  updated_at: Date;
-  /** Importance score from 1-5 for prioritization */
-  importance_score: number;
-};
-
-/**
- * Represents a memory with its embedding information
- */
-export type MemoryWithEmbedding = Memory & {
-  /** Vector embedding for semantic similarity search */
-  embedding: number[];
-  /** The embedding model used to generate the vector */
-  embedding_model: string;
-  /** The embedding provider */
-  embedding_provider: EmbeddingProviderType;
-};
+import { MemoryWithEmbedding } from '../memory/index.js';
 
 /**
  * Input parameters for creating a new memory
@@ -43,7 +12,7 @@ export type CreateMemoryInput = {
   /** Optional array of tags for categorization */
   tags?: string[];
   /** Optional importance score (1-5), defaults to 1 */
-  importance_score?: number;
+  importanceScore?: number;
 };
 
 /**
@@ -55,13 +24,13 @@ export type SearchMemoryInput = {
   /** Maximum number of results to return, defaults to 10 */
   limit?: number;
   /** Minimum similarity threshold (0-1), defaults to 0.7 */
-  similarity_threshold?: number;
+  similarityThreshold?: number;
   /** Optional array of tags to filter results */
   tags?: string[];
   /** Optional embedding provider to search within */
-  embedding_provider?: EmbeddingProviderType;
+  embeddingProvider?: EmbeddingProviderType;
   /** Optional specific model to filter by */
-  embedding_model?: string;
+  embeddingModel?: string;
 };
 
 /**
@@ -71,7 +40,7 @@ export type SearchResult = {
   /** The memory that matched the search */
   memory: MemoryWithEmbedding;
   /** Cosine similarity score between query and memory (0-1) */
-  similarity_score: number;
+  similarityScore: number;
 };
 
 /**
@@ -85,11 +54,46 @@ export type ListMemoriesInput = {
   /** Optional array of tags to filter by */
   tags?: string[];
   /** Minimum importance score to include */
-  min_importance?: number;
+  minImportance?: number;
   /** Start date for filtering (ISO string format) */
-  start_date?: string;
+  startDate?: string;
   /** End date for filtering (ISO string format) */
-  end_date?: string;
+  endDate?: string;
   /** Optional embedding provider to filter by */
-  embedding_provider?: EmbeddingProviderType;
+  embeddingProvider?: EmbeddingProviderType;
+};
+
+/**
+ * Internal types for database row results with camelCase conversion
+ */
+export type MemoryRow = {
+  id: number;
+  content: string;
+  context?: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+  importance_score: number;
+};
+
+export type MemoryWithEmbeddingRow = MemoryRow & {
+  embedding: string;
+  model: string;
+};
+
+export type SearchResultRow = MemoryWithEmbeddingRow & {
+  similarity_score: string;
+};
+
+export type StatsRow = {
+  total_memories: string;
+  avg_importance: string;
+};
+
+export type TagRow = {
+  tag: string;
+};
+
+export type CountRow = {
+  count: string;
 };

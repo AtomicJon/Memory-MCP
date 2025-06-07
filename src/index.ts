@@ -47,10 +47,9 @@ class MemoryMCPServer {
     );
 
     // Initialize database connection
-    const databaseUrl =
-      process.env.DATABASE_URL ||
-      'postgresql://memory_user:memory_password@localhost:5432/memory_mcp';
-    this.database = new DatabaseService(databaseUrl);
+    // For PGlite, we can optionally use a data directory or default to in-memory
+    const dataDir = process.env.PGLITE_DATA_DIR; // Optional: persist to filesystem
+    this.database = new DatabaseService(dataDir);
 
     // Initialize embedding service
     const embeddingConfig: EmbeddingConfig = {
@@ -83,7 +82,7 @@ class MemoryMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
-          name: 'store_memory',
+          name: 'storeMemory',
           description: 'Store a coding preference or correction as a memory',
           inputSchema: {
             type: 'object',
@@ -101,7 +100,7 @@ class MemoryMCPServer {
                 items: { type: 'string' },
                 description: 'Optional array of tags for categorization',
               },
-              importance_score: {
+              importanceScore: {
                 type: 'number',
                 minimum: 1,
                 maximum: 5,
@@ -112,7 +111,7 @@ class MemoryMCPServer {
           },
         },
         {
-          name: 'search_memories',
+          name: 'searchMemories',
           description: 'Search for relevant memories using semantic similarity',
           inputSchema: {
             type: 'object',
@@ -126,7 +125,7 @@ class MemoryMCPServer {
                 description:
                   'Maximum number of results to return, defaults to 10',
               },
-              similarity_threshold: {
+              similarityThreshold: {
                 type: 'number',
                 minimum: 0,
                 maximum: 1,
@@ -138,7 +137,7 @@ class MemoryMCPServer {
                 items: { type: 'string' },
                 description: 'Optional array of tags to filter results',
               },
-              embedding_provider: {
+              embeddingProvider: {
                 type: 'string',
                 enum: [
                   EmbeddingProviderType.OPENAI,
@@ -146,7 +145,7 @@ class MemoryMCPServer {
                 ],
                 description: 'Optional embedding provider to search within',
               },
-              embedding_model: {
+              embeddingModel: {
                 type: 'string',
                 description: 'Optional specific model to filter by',
               },
@@ -155,7 +154,7 @@ class MemoryMCPServer {
           },
         },
         {
-          name: 'list_memories',
+          name: 'listMemories',
           description: 'List memories with optional filtering',
           inputSchema: {
             type: 'object',
@@ -175,21 +174,21 @@ class MemoryMCPServer {
                 items: { type: 'string' },
                 description: 'Optional array of tags to filter by',
               },
-              min_importance: {
+              minImportance: {
                 type: 'number',
                 minimum: 1,
                 maximum: 5,
                 description: 'Minimum importance score to include',
               },
-              start_date: {
+              startDate: {
                 type: 'string',
                 description: 'Start date for filtering (ISO string format)',
               },
-              end_date: {
+              endDate: {
                 type: 'string',
                 description: 'End date for filtering (ISO string format)',
               },
-              embedding_provider: {
+              embeddingProvider: {
                 type: 'string',
                 enum: [
                   EmbeddingProviderType.OPENAI,
@@ -202,21 +201,21 @@ class MemoryMCPServer {
           },
         },
         {
-          name: 'delete_memory',
+          name: 'deleteMemory',
           description: 'Delete a memory by ID',
           inputSchema: {
             type: 'object',
             properties: {
-              memory_id: {
+              memoryId: {
                 type: 'number',
                 description: 'The ID of the memory to delete',
               },
             },
-            required: ['memory_id'],
+            required: ['memoryId'],
           },
         },
         {
-          name: 'list_tags',
+          name: 'listTags',
           description: 'List all unique tags used in memories',
           inputSchema: {
             type: 'object',
@@ -225,7 +224,7 @@ class MemoryMCPServer {
           },
         },
         {
-          name: 'get_memory_stats',
+          name: 'getMemoryStats',
           description: 'Get statistics about stored memories',
           inputSchema: {
             type: 'object',
@@ -239,22 +238,22 @@ class MemoryMCPServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         switch (request.params.name) {
-          case 'store_memory':
+          case 'storeMemory':
             return await this.handleStoreMemory(request.params.arguments);
 
-          case 'search_memories':
+          case 'searchMemories':
             return await this.handleSearchMemories(request.params.arguments);
 
-          case 'list_memories':
+          case 'listMemories':
             return await this.handleListMemories(request.params.arguments);
 
-          case 'delete_memory':
+          case 'deleteMemory':
             return await this.handleDeleteMemory(request.params.arguments);
 
-          case 'list_tags':
+          case 'listTags':
             return await this.handleListTags();
 
-          case 'get_memory_stats':
+          case 'getMemoryStats':
             return await this.handleGetMemoryStats();
 
           default:
@@ -281,13 +280,13 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle store_memory tool
+   * Handle storeMemory tool
    */
   private async handleStoreMemory(args: unknown) {
     if (!isValidStoreMemoryArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'Invalid store_memory arguments',
+        'Invalid storeMemory arguments',
       );
     }
 
@@ -310,14 +309,11 @@ class MemoryMCPServer {
             {
               success: true,
               memory: {
-                id: memory.id,
-                content: memory.content,
-                context: memory.context,
-                tags: memory.tags,
-                importance_score: memory.importance_score,
-                embedding_model: memory.embedding_model,
-                embedding_provider: memory.embedding_provider,
-                created_at: memory.created_at,
+                ...memory,
+                importanceScore: memory.importanceScore,
+                embeddingModel: memory.embeddingModel,
+                embeddingProvider: memory.embeddingProvider,
+                createdAt: memory.createdAt,
               },
             },
             null,
@@ -329,13 +325,13 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle search_memories tool
+   * Handle searchMemories tool
    */
   private async handleSearchMemories(args: unknown) {
     if (!isValidSearchMemoriesArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'Invalid search_memories arguments',
+        'Invalid searchMemories arguments',
       );
     }
 
@@ -358,18 +354,15 @@ class MemoryMCPServer {
               success: true,
               results: results.map((result) => ({
                 memory: {
-                  id: result.memory.id,
-                  content: result.memory.content,
-                  context: result.memory.context,
-                  tags: result.memory.tags,
-                  importance_score: result.memory.importance_score,
-                  embedding_model: result.memory.embedding_model,
-                  embedding_provider: result.memory.embedding_provider,
-                  created_at: result.memory.created_at,
+                  ...result.memory,
+                  importanceScore: result.memory.importanceScore,
+                  embeddingModel: result.memory.embeddingModel,
+                  embeddingProvider: result.memory.embeddingProvider,
+                  createdAt: result.memory.createdAt,
                 },
-                similarity_score: result.similarity_score,
+                similarityScore: result.similarityScore,
               })),
-              total_results: results.length,
+              totalResults: results.length,
             },
             null,
             2,
@@ -380,13 +373,13 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle list_memories tool
+   * Handle listMemories tool
    */
   private async handleListMemories(args: unknown) {
     if (!isValidListMemoriesArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'Invalid list_memories arguments',
+        'Invalid listMemories arguments',
       );
     }
 
@@ -400,14 +393,11 @@ class MemoryMCPServer {
             {
               success: true,
               memories: memories.map((memory) => ({
-                id: memory.id,
-                content: memory.content,
-                context: memory.context,
-                tags: memory.tags,
-                importance_score: memory.importance_score,
-                created_at: memory.created_at,
+                ...memory,
+                importanceScore: memory.importanceScore,
+                createdAt: memory.createdAt,
               })),
-              total_results: memories.length,
+              totalResults: memories.length,
             },
             null,
             2,
@@ -418,17 +408,17 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle delete_memory tool
+   * Handle deleteMemory tool
    */
   private async handleDeleteMemory(args: unknown) {
     if (!isValidDeleteMemoryArgs(args)) {
       throw new McpError(
         ErrorCode.InvalidParams,
-        'Invalid delete_memory arguments',
+        'Invalid deleteMemory arguments',
       );
     }
 
-    const deleted = await this.database.deleteMemory(args.memory_id);
+    const deleted = await this.database.deleteMemory(args.memoryId);
 
     return {
       content: [
@@ -438,8 +428,8 @@ class MemoryMCPServer {
             {
               success: deleted,
               message: deleted
-                ? `Memory ${args.memory_id} deleted successfully`
-                : `Memory ${args.memory_id} not found`,
+                ? `Memory ${args.memoryId} deleted successfully`
+                : `Memory ${args.memoryId} not found`,
             },
             null,
             2,
@@ -450,7 +440,7 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle list_tags tool
+   * Handle listTags tool
    */
   private async handleListTags() {
     const tags = await this.database.listTags();
@@ -463,7 +453,7 @@ class MemoryMCPServer {
             {
               success: true,
               tags: tags,
-              total_tags: tags.length,
+              totalTags: tags.length,
             },
             null,
             2,
@@ -474,7 +464,7 @@ class MemoryMCPServer {
   }
 
   /**
-   * Handle get_memory_stats tool
+   * Handle getMemoryStats tool
    */
   private async handleGetMemoryStats() {
     const stats = await this.database.getStats();
@@ -487,14 +477,10 @@ class MemoryMCPServer {
             {
               success: true,
               stats: {
-                total_memories: stats.total_memories,
-                average_importance: stats.avg_importance,
-                unique_tags: stats.unique_tags,
-                openai_embeddings: stats.openai_embeddings,
-                ollama_embeddings: stats.ollama_embeddings,
-                current_provider: this.embeddings.getProvider(),
-                current_model: this.embeddings.getModel(),
-                current_dimensions: this.embeddings.getDimensions(),
+                ...stats,
+                currentProvider: this.embeddings.getProvider(),
+                currentModel: this.embeddings.getModel(),
+                currentDimensions: this.embeddings.getDimensions(),
               },
             },
             null,
@@ -510,10 +496,11 @@ class MemoryMCPServer {
    */
   async run() {
     try {
-      // Test database connection
+      // Test database connection and initialize schema
       await this.database.testConnection();
+      await this.database.initializeSchema();
       // Using error since MCP is using stdio transport
-      console.error('Database connection successful');
+      console.error('Database connection and schema initialization successful');
 
       // Start MCP server
       const transport = new StdioServerTransport();

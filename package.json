@@ -8,7 +8,7 @@
         "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
         "dev": "tsc --watch",
         "start": "node build/index.js",
-        "test": "jest",
+        "test": "node --experimental-vm-modules ./node_modules/.bin/jest",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "lint": "eslint 'src/**/*.ts'",
@@ -17,17 +17,16 @@
         "format:check": "prettier --check src/**/*.ts"
     },
     "dependencies": {
+        "@electric-sql/pglite": "^0.3.3",
         "@modelcontextprotocol/sdk": "^0.5.0",
         "dotenv": "^16.4.5",
         "ollama": "^0.5.15",
-        "openai": "^4.28.0",
-        "pg": "^8.11.3"
+        "openai": "^4.28.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.27.0",
         "@types/jest": "^29.5.14",
         "@types/node": "^20.11.17",
-        "@types/pg": "^8.10.9",
         "@typescript-eslint/eslint-plugin": "^8.32.1",
         "@typescript-eslint/parser": "^8.32.1",
         "eslint": "^9.27.0",

@@ -1,45 +1,59 @@
-import { Pool } from 'pg';
-import { EmbeddingProviderType } from '../embedding/embedding.types.js';
+import { PGlite } from '@electric-sql/pglite';
+import { vector } from '@electric-sql/pglite/vector';
+import { EmbeddingProviderType } from '../embedding/index.js';
+import { Memory, MemoryStats, MemoryWithEmbedding } from '../memory/index.js';
 import {
+  INITIALIZATION_SQL,
+  MEMORY_COLUMNS,
+  MEMORY_WITH_EMBEDDING_COLUMNS,
+  SEARCH_RESULT_COLUMNS,
+} from './database.queries.js';
+import {
+  CountRow,
   CreateMemoryInput,
   ListMemoriesInput,
-  Memory,
-  MemoryWithEmbedding,
+  MemoryRow,
+  MemoryWithEmbeddingRow,
   SearchMemoryInput,
   SearchResult,
+  SearchResultRow,
+  StatsRow,
+  TagRow,
 } from './database.types.js';
 
 /**
- * Database service for managing memory storage with PostgreSQL and pgvector
+ * Database service for managing memory storage with PGlite and pgvector
  * Handles storage, retrieval, and search operations for memories with vector embeddings
  */
 export class DatabaseService {
-  private pool: Pool;
+  private db: PGlite;
 
   /**
    * Creates a new database service instance
-   * @param connectionString - PostgreSQL connection string for the database
+   * @param dataDir - Directory path for PGlite database files (optional, defaults to in-memory)
    */
-  constructor(connectionString: string) {
-    this.pool = new Pool({
-      connectionString,
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+  constructor(dataDir?: string) {
+    this.db = new PGlite(dataDir || 'memory://memory_mcp', {
+      extensions: {
+        vector,
+      },
     });
   }
 
   /**
-   * Test the database connection
-   * @throws Error if unable to connect to the database
+   * Initialize the database with schema and test connection
+   * @throws Error if unable to connect to the database or initialize schema
    */
   async testConnection(): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('SELECT 1');
-    } finally {
-      client.release();
-    }
+    await this.db.query('SELECT 1');
+  }
+
+  /**
+   * Initialize the database schema with tables, indexes, and functions
+   * @throws Error if schema initialization fails
+   */
+  async initializeSchema(): Promise<void> {
+    await this.db.exec(INITIALIZATION_SQL);
   }
 
   /**
@@ -57,25 +71,27 @@ export class DatabaseService {
     embeddingModel: string,
     embeddingProvider: EmbeddingProviderType,
   ): Promise<MemoryWithEmbedding> {
-    const client = await this.pool.connect();
     try {
-      await client.query('BEGIN');
+      await this.db.query('BEGIN');
 
       const memoryQuery = `
         INSERT INTO memories (content, context, tags, importance_score)
         VALUES ($1, $2, $3, $4)
-        RETURNING id, content, context, tags, created_at, updated_at, importance_score
+        RETURNING ${MEMORY_COLUMNS}
       `;
 
       const memoryValues = [
         input.content,
         input.context || null,
         input.tags || [],
-        input.importance_score || 1,
+        input.importanceScore || 1,
       ];
 
-      const memoryResult = await client.query(memoryQuery, memoryValues);
-      const memory = memoryResult.rows[0];
+      const memoryResult = await this.db.query<MemoryRow>(
+        memoryQuery,
+        memoryValues,
+      );
+      const memoryRow = memoryResult.rows[0];
 
       const embeddingTableName = `memory_embeddings_${embeddingProvider}`;
       const embeddingQuery = `
@@ -83,31 +99,29 @@ export class DatabaseService {
         VALUES ($1, $2, $3)
       `;
 
-      await client.query(embeddingQuery, [
-        memory.id,
-        JSON.stringify(embedding),
+      await this.db.query(embeddingQuery, [
+        memoryRow.id,
+        `[${embedding.join(',')}]`,
         embeddingModel,
       ]);
 
-      await client.query('COMMIT');
+      await this.db.query('COMMIT');
 
       return {
-        id: memory.id,
-        content: memory.content,
-        context: memory.context,
-        tags: memory.tags,
-        created_at: memory.created_at,
-        updated_at: memory.updated_at,
-        importance_score: memory.importance_score,
+        id: memoryRow.id,
+        content: memoryRow.content,
+        context: memoryRow.context,
+        tags: memoryRow.tags,
+        createdAt: new Date(memoryRow.created_at),
+        updatedAt: new Date(memoryRow.updated_at),
+        importanceScore: memoryRow.importance_score,
         embedding,
-        embedding_model: embeddingModel,
-        embedding_provider: embeddingProvider,
+        embeddingModel,
+        embeddingProvider,
       };
     } catch (error) {
-      await client.query('ROLLBACK');
+      await this.db.query('ROLLBACK');
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -124,66 +138,58 @@ export class DatabaseService {
     queryEmbedding: number[],
     embeddingProvider: EmbeddingProviderType,
   ): Promise<SearchResult[]> {
-    const client = await this.pool.connect();
-    try {
-      const searchProvider = input.embedding_provider || embeddingProvider;
-      const embeddingTableName = `memory_embeddings_${searchProvider}`;
+    const searchProvider = input.embeddingProvider || embeddingProvider;
+    const embeddingTableName = `memory_embeddings_${searchProvider}`;
 
-      let query = `
-        SELECT 
-          m.id, m.content, m.context, m.tags, m.created_at, m.updated_at, m.importance_score,
-          e.embedding, e.model,
-          1 - (e.embedding <=> $1::vector) as similarity_score
-        FROM memories m
-        JOIN ${embeddingTableName} e ON m.id = e.memory_id
-        WHERE 1 - (e.embedding <=> $1::vector) >= $2
-      `;
+    let query = `
+      SELECT ${SEARCH_RESULT_COLUMNS}
+      FROM memories m
+      JOIN ${embeddingTableName} e ON m.id = e.memory_id
+      WHERE 1 - (e.embedding <=> $1::vector) >= $2
+    `;
 
-      const values: unknown[] = [
-        JSON.stringify(queryEmbedding),
-        input.similarity_threshold || 0.7,
-      ];
+    const values: unknown[] = [
+      `[${queryEmbedding.join(',')}]`,
+      input.similarityThreshold || 0.7,
+    ];
 
-      let paramIndex = 3;
+    let paramIndex = 3;
 
-      if (input.embedding_model) {
-        query += ` AND e.model = $${paramIndex}`;
-        values.push(input.embedding_model);
-        paramIndex++;
-      }
-
-      if (input.tags && input.tags.length > 0) {
-        query += ` AND m.tags && $${paramIndex}`;
-        values.push(input.tags);
-        paramIndex++;
-      }
-
-      query += `
-        ORDER BY similarity_score DESC, m.importance_score DESC
-        LIMIT $${paramIndex}
-      `;
-      values.push(input.limit || 10);
-
-      const result = await client.query(query, values);
-
-      return result.rows.map((row) => ({
-        memory: {
-          id: row.id,
-          content: row.content,
-          context: row.context,
-          tags: row.tags,
-          created_at: row.created_at,
-          updated_at: row.updated_at,
-          importance_score: row.importance_score,
-          embedding: JSON.parse(row.embedding),
-          embedding_model: row.model,
-          embedding_provider: searchProvider,
-        },
-        similarity_score: parseFloat(row.similarity_score),
-      }));
-    } finally {
-      client.release();
+    if (input.embeddingModel) {
+      query += ` AND e.model = $${paramIndex}`;
+      values.push(input.embeddingModel);
+      paramIndex++;
     }
+
+    if (input.tags && input.tags.length > 0) {
+      query += ` AND m.tags && $${paramIndex}`;
+      values.push(input.tags);
+      paramIndex++;
+    }
+
+    query += `
+      ORDER BY similarity_score DESC, m.importance_score DESC
+      LIMIT $${paramIndex}
+    `;
+    values.push(input.limit || 10);
+
+    const result = await this.db.query<SearchResultRow>(query, values);
+
+    return result.rows.map((row) => ({
+      memory: {
+        id: row.id,
+        content: row.content,
+        context: row.context,
+        tags: row.tags,
+        createdAt: new Date(row.created_at),
+        updatedAt: new Date(row.updated_at),
+        importanceScore: row.importance_score,
+        embedding: JSON.parse(row.embedding),
+        embeddingModel: row.model,
+        embeddingProvider: searchProvider,
+      },
+      similarityScore: parseFloat(row.similarity_score),
+    }));
   }
 
   /**
@@ -193,74 +199,69 @@ export class DatabaseService {
    * @throws Error if the database query fails
    */
   async listMemories(input: ListMemoriesInput = {}): Promise<Memory[]> {
-    const client = await this.pool.connect();
-    try {
-      let query = `
-        SELECT id, content, context, tags, created_at, updated_at, importance_score
-        FROM memories
-        WHERE 1=1
-      `;
+    let query = `
+      SELECT ${MEMORY_COLUMNS}
+      FROM memories
+      WHERE 1=1
+    `;
 
-      const values: unknown[] = [];
-      let paramIndex = 1;
+    const values: unknown[] = [];
+    let paramIndex = 1;
 
-      if (input.tags && input.tags.length > 0) {
-        query += ` AND tags && $${paramIndex}`;
-        values.push(input.tags);
-        paramIndex++;
-      }
-
-      if (input.min_importance) {
-        query += ` AND importance_score >= $${paramIndex}`;
-        values.push(input.min_importance);
-        paramIndex++;
-      }
-
-      if (input.start_date) {
-        query += ` AND created_at >= $${paramIndex}`;
-        values.push(input.start_date);
-        paramIndex++;
-      }
-
-      if (input.end_date) {
-        query += ` AND created_at <= $${paramIndex}`;
-        values.push(input.end_date);
-        paramIndex++;
-      }
-
-      if (input.embedding_provider) {
-        const embeddingTableName = `memory_embeddings_${input.embedding_provider}`;
-        query += ` AND EXISTS (SELECT 1 FROM ${embeddingTableName} WHERE memory_id = memories.id)`;
-      }
-
-      query += ` ORDER BY created_at DESC`;
-
-      if (input.limit) {
-        query += ` LIMIT $${paramIndex}`;
-        values.push(input.limit);
-        paramIndex++;
-      }
-
-      if (input.offset) {
-        query += ` OFFSET $${paramIndex}`;
-        values.push(input.offset);
-        paramIndex++;
-      }
-
-      const result = await client.query(query, values);
-
-      return result.rows.map((row) => ({
-        id: row.id,
-        content: row.content,
-        context: row.context,
-        tags: row.tags,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        importance_score: row.importance_score,
-      }));
-    } finally {
-      client.release();
+    if (input.tags && input.tags.length > 0) {
+      query += ` AND tags && $${paramIndex}`;
+      values.push(input.tags);
+      paramIndex++;
     }
+
+    if (input.minImportance) {
+      query += ` AND importance_score >= $${paramIndex}`;
+      values.push(input.minImportance);
+      paramIndex++;
+    }
+
+    if (input.startDate) {
+      query += ` AND created_at >= $${paramIndex}`;
+      values.push(input.startDate);
+      paramIndex++;
+    }
+
+    if (input.endDate) {
+      query += ` AND created_at <= $${paramIndex}`;
+      values.push(input.endDate);
+      paramIndex++;
+    }
+
+    if (input.embeddingProvider) {
+      const embeddingTableName = `memory_embeddings_${input.embeddingProvider}`;
+      query += ` AND EXISTS (SELECT 1 FROM ${embeddingTableName} WHERE memory_id = memories.id)`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    if (input.limit) {
+      query += ` LIMIT $${paramIndex}`;
+      values.push(input.limit);
+      paramIndex++;
+    }
+
+    if (input.offset) {
+      query += ` OFFSET $${paramIndex}`;
+      values.push(input.offset);
+      paramIndex++;
+    }
+
+    const result = await this.db.query<MemoryRow>(query, values);
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      content: row.content,
+      context: row.context,
+      tags: row.tags,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      importanceScore: row.importance_score,
+    }));
   }
 
   /**
@@ -270,33 +271,28 @@ export class DatabaseService {
    * @throws Error if the database query fails
    */
   async getMemoryById(id: number): Promise<Memory | null> {
-    const client = await this.pool.connect();
-    try {
-      const query = `
-        SELECT id, content, context, tags, created_at, updated_at, importance_score
-        FROM memories
-        WHERE id = $1
-      `;
+    const query = `
+      SELECT ${MEMORY_COLUMNS}
+      FROM memories
+      WHERE id = $1
+    `;
 
-      const result = await client.query(query, [id]);
+    const result = await this.db.query<MemoryRow>(query, [id]);
 
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        content: row.content,
-        context: row.context,
-        tags: row.tags,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        importance_score: row.importance_score,
-      };
-    } finally {
-      client.release();
+    if (result.rows.length === 0) {
+      return null;
     }
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      content: row.content,
+      context: row.context,
+      tags: row.tags,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      importanceScore: row.importance_score,
+    };
   }
 
   /**
@@ -310,40 +306,33 @@ export class DatabaseService {
     id: number,
     embeddingProvider: EmbeddingProviderType,
   ): Promise<MemoryWithEmbedding | null> {
-    const client = await this.pool.connect();
-    try {
-      const embeddingTableName = `memory_embeddings_${embeddingProvider}`;
-      const query = `
-        SELECT 
-          m.id, m.content, m.context, m.tags, m.created_at, m.updated_at, m.importance_score,
-          e.embedding, e.model
-        FROM memories m
-        JOIN ${embeddingTableName} e ON m.id = e.memory_id
-        WHERE m.id = $1
-      `;
+    const embeddingTableName = `memory_embeddings_${embeddingProvider}`;
+    const query = `
+      SELECT ${MEMORY_WITH_EMBEDDING_COLUMNS}
+      FROM memories m
+      JOIN ${embeddingTableName} e ON m.id = e.memory_id
+      WHERE m.id = $1
+    `;
 
-      const result = await client.query(query, [id]);
+    const result = await this.db.query<MemoryWithEmbeddingRow>(query, [id]);
 
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      const row = result.rows[0];
-      return {
-        id: row.id,
-        content: row.content,
-        context: row.context,
-        tags: row.tags,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        importance_score: row.importance_score,
-        embedding: JSON.parse(row.embedding),
-        embedding_model: row.model,
-        embedding_provider: embeddingProvider,
-      };
-    } finally {
-      client.release();
+    if (result.rows.length === 0) {
+      return null;
     }
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      content: row.content,
+      context: row.context,
+      tags: row.tags,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      importanceScore: row.importance_score,
+      embedding: JSON.parse(row.embedding),
+      embeddingModel: row.model,
+      embeddingProvider: embeddingProvider,
+    };
   }
 
   /**
@@ -353,14 +342,9 @@ export class DatabaseService {
    * @throws Error if the database operation fails
    */
   async deleteMemory(id: number): Promise<boolean> {
-    const client = await this.pool.connect();
-    try {
-      const query = 'DELETE FROM memories WHERE id = $1';
-      const result = await client.query(query, [id]);
-      return result.rowCount !== null && result.rowCount > 0;
-    } finally {
-      client.release();
-    }
+    const query = 'DELETE FROM memories WHERE id = $1';
+    const result = await this.db.query(query, [id]);
+    return result.affectedRows !== undefined && result.affectedRows > 0;
   }
 
   /**
@@ -369,20 +353,15 @@ export class DatabaseService {
    * @throws Error if the database query fails
    */
   async listTags(): Promise<string[]> {
-    const client = await this.pool.connect();
-    try {
-      const query = `
-        SELECT DISTINCT unnest(tags) as tag
-        FROM memories
-        WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
-        ORDER BY tag
-      `;
+    const query = `
+      SELECT DISTINCT unnest(tags) as tag
+      FROM memories
+      WHERE tags IS NOT NULL AND array_length(tags, 1) > 0
+      ORDER BY tag
+    `;
 
-      const result = await client.query(query);
-      return result.rows.map((row) => row.tag);
-    } finally {
-      client.release();
-    }
+    const result = await this.db.query<TagRow>(query);
+    return result.rows.map((row) => row.tag);
   }
 
   /**
@@ -390,54 +369,43 @@ export class DatabaseService {
    * @returns Promise resolving to statistics including memory counts, importance averages, and embedding counts by provider
    * @throws Error if the database queries fail
    */
-  async getStats(): Promise<{
-    total_memories: number;
-    avg_importance: number;
-    unique_tags: string[];
-    openai_embeddings: number;
-    ollama_embeddings: number;
-  }> {
-    const client = await this.pool.connect();
-    try {
-      const statsQuery = `
-        SELECT 
-          COUNT(*) as total_memories,
-          AVG(importance_score) as avg_importance
-        FROM memories
-      `;
+  async getStats(): Promise<MemoryStats> {
+    const statsQuery = `
+      SELECT
+        COUNT(*) as total_memories,
+        AVG(importance_score) as avg_importance
+      FROM memories
+    `;
 
-      const tagsQuery = `
-        SELECT DISTINCT unnest(tags) as tag
-        FROM memories
-        ORDER BY tag
-      `;
+    const tagsQuery = `
+      SELECT DISTINCT unnest(tags) as tag
+      FROM memories
+      ORDER BY tag
+    `;
 
-      const openaiCountQuery = `
-        SELECT COUNT(*) as count FROM memory_embeddings_openai
-      `;
+    const openaiCountQuery = `
+      SELECT COUNT(*) as count FROM memory_embeddings_openai
+    `;
 
-      const ollamaCountQuery = `
-        SELECT COUNT(*) as count FROM memory_embeddings_ollama
-      `;
+    const ollamaCountQuery = `
+      SELECT COUNT(*) as count FROM memory_embeddings_ollama
+    `;
 
-      const [statsResult, tagsResult, openaiResult, ollamaResult] =
-        await Promise.all([
-          client.query(statsQuery),
-          client.query(tagsQuery),
-          client.query(openaiCountQuery),
-          client.query(ollamaCountQuery),
-        ]);
+    const [statsResult, tagsResult, openaiResult, ollamaResult] =
+      await Promise.all([
+        this.db.query<StatsRow>(statsQuery),
+        this.db.query<TagRow>(tagsQuery),
+        this.db.query<CountRow>(openaiCountQuery),
+        this.db.query<CountRow>(ollamaCountQuery),
+      ]);
 
-      return {
-        total_memories: parseInt(statsResult.rows[0].total_memories),
-        avg_importance: parseFloat(statsResult.rows[0].avg_importance) || 0,
-        unique_tags: tagsResult.rows.map((row) => row.tag),
-        openai_embeddings: parseInt(openaiResult.rows[0].count),
-        ollama_embeddings: parseInt(ollamaResult.rows[0].count),
-      };
-    } finally {
-      client.release();
-    }
+    return {
+      totalMemories: parseInt(statsResult.rows[0].total_memories),
+      avgImportance: parseFloat(statsResult.rows[0].avg_importance) || 0,
+      uniqueTags: tagsResult.rows.map((row) => row.tag),
+      openaiEmbeddings: parseInt(openaiResult.rows[0].count),
+      ollamaEmbeddings: parseInt(ollamaResult.rows[0].count),
+    };
   }
 
   /**
@@ -446,6 +414,6 @@ export class DatabaseService {
    * @throws Error if closing the pool fails
    */
   async close(): Promise<void> {
-    await this.pool.end();
+    await this.db.close();
   }
 }
