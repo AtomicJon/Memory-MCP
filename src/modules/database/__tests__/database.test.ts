@@ -1,6 +1,10 @@
 import { EmbeddingProviderType } from '../../embedding/embedding.types.js';
 import { DatabaseService } from '../database.service.js';
-import { CreateMemoryInput, SearchMemoryInput } from '../database.types.js';
+import {
+  CreateMemoryInput,
+  DatabaseType,
+  SearchMemoryInput,
+} from '../database.types.js';
 
 // Mock data for testing
 const mockEmbeddings = {
@@ -25,7 +29,7 @@ describe('DatabaseService Multi-Embedding Support', () => {
 
   beforeAll(async () => {
     // Arrange - Use in-memory PGlite database for testing
-    database = new DatabaseService(); // No dataDir = in-memory
+    database = new DatabaseService({ type: DatabaseType.PGLITE }); // In-memory PGlite for testing
 
     // Ensure database connection works and initialize schema
     await database.testConnection();

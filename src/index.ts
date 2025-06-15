@@ -8,7 +8,11 @@ import {
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
 import { config } from 'dotenv';
-import { DatabaseService } from './modules/database/index.js';
+import {
+  DatabaseService,
+  DatabaseConfig,
+  DatabaseType,
+} from './modules/database/index.js';
 import {
   EmbeddingConfig,
   EmbeddingProviderType,
@@ -47,9 +51,8 @@ class MemoryMCPServer {
     );
 
     // Initialize database connection
-    // For PGlite, we can optionally use a data directory or default to in-memory
-    const dataDir = process.env.PGLITE_DATA_DIR; // Optional: persist to filesystem
-    this.database = new DatabaseService(dataDir);
+    const databaseConfig: DatabaseConfig = this.createDatabaseConfig();
+    this.database = new DatabaseService(databaseConfig);
 
     // Initialize embedding service
     const embeddingConfig: EmbeddingConfig = {
@@ -73,6 +76,28 @@ class MemoryMCPServer {
       await this.cleanup();
       process.exit(0);
     });
+  }
+
+  /**
+   * Create database configuration based on environment variables
+   */
+  private createDatabaseConfig(): DatabaseConfig {
+    const databaseUrl = process.env.DATABASE_URL;
+    const pgliteDataDir = process.env.PGLITE_DATA_DIR;
+
+    // If DATABASE_URL is provided, use PostgreSQL
+    if (databaseUrl) {
+      return {
+        type: DatabaseType.POSTGRESQL,
+        connectionString: databaseUrl,
+      };
+    }
+
+    // Otherwise, use PGlite (default)
+    return {
+      type: DatabaseType.PGLITE,
+      dataDir: pgliteDataDir,
+    };
   }
 
   /**

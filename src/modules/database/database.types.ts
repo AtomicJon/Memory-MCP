@@ -2,6 +2,24 @@ import { EmbeddingProviderType } from '../embedding/embedding.types.js';
 import { MemoryWithEmbedding } from '../memory/index.js';
 
 /**
+ * Database configuration types
+ */
+export enum DatabaseType {
+  PGLITE = 'pglite',
+  POSTGRESQL = 'postgresql',
+}
+
+export type DatabaseConfig =
+  | {
+      type: DatabaseType.PGLITE;
+      dataDir?: string;
+    }
+  | {
+      type: DatabaseType.POSTGRESQL;
+      connectionString: string;
+    };
+
+/**
  * Input parameters for creating a new memory
  */
 export type CreateMemoryInput = {
